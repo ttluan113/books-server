@@ -65,7 +65,7 @@ class controllerUser {
                 `logged=${0}; Max-Age=0; Path=/; SameSite=Lax`,
             ])
             .status(200)
-            .json({ message: 'Đăng ký thành công !!!' });
+            .json({ message: 'Đăng xuất thành công !!!' });
     }
 
     async login(req, res) {
