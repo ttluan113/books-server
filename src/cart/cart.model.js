@@ -4,14 +4,14 @@ const Schema = mongoose.Schema;
 
 const modelCart = new Schema(
     {
-        userId: { type: String, require: true },
+        userId: { type: String, require: true, ref: 'user' },
         products: [
             {
                 productId: { type: String, require: true },
                 quantity: { type: Number, require: true },
             },
         ],
-        discount: { type: Number, default: 0 },
+        total: { type: Number, require: true },
     },
     {
         timestamps: true,

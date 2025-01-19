@@ -5,6 +5,7 @@ const { createToken, createRefreshToken } = require('../services/token');
 const joi = require('joi');
 const authUser = require('../services/authUser');
 const CryptoJS = require('crypto-js');
+const searchAddress = require('../utils/searchAddress');
 require('dotenv').config();
 
 const schemaRegister = joi.object({
@@ -88,6 +89,13 @@ class controllerUser {
             ])
             .status(200)
             .json({ message: 'Đăng nhập thành công !!!' });
+    }
+
+    async searchAddress(req, res) {
+        const { address } = req.query;
+
+        const result = await searchAddress(address);
+        return res.status(200).json(result);
     }
 }
 
