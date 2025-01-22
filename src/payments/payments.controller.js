@@ -111,8 +111,8 @@ class controllerPayments {
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             const vnpayResponse = await vnpay.buildPaymentUrl({
-                vnp_Amount: findCart.total,
-                vnp_IpAddr: '127.0.0.1',
+                vnp_Amount: findCart.total, //
+                vnp_IpAddr: '127.0.0.1', //
                 vnp_TxnRef: findCart._id,
                 vnp_OrderInfo: `${findCart._id}`,
                 vnp_OrderType: ProductCode.Other,

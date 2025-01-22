@@ -35,8 +35,8 @@ class controllerUser {
         const newUser = new modelUser({ fullName, email, password: hashPassword, phone });
         await newUser.save();
         // await sendMailVerifyAccount(email);
-        const accessToken = createToken({ id: newUser._id });
-        const refreshToken = createRefreshToken({ id: newUser._id });
+        const accessToken = createToken({ id: newUser._id, isAdmin: newUser.isAdmin });
+        const refreshToken = createRefreshToken({ id: newUser._id, isAdmin: newUser.isAdmin });
         return res
             .setHeader('Set-Cookie', [
                 `token=${accessToken}; HttpOnly; Secure; Max-Age=86400; Path=/; SameSite=Strict`,
@@ -79,8 +79,8 @@ class controllerUser {
         if (!isMatch) {
             return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không đúng' });
         }
-        const accessToken = createToken({ id: user._id });
-        const refreshToken = createRefreshToken({ id: user._id });
+        const accessToken = createToken({ id: user._id, isAdmin: user.isAdmin });
+        const refreshToken = createRefreshToken({ id: user._id, isAdmin: user.isAdmin });
         return res
             .setHeader('Set-Cookie', [
                 `token=${accessToken}; HttpOnly; Secure; Max-Age=86400; Path=/; SameSite=Strict`,

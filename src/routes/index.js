@@ -3,6 +3,7 @@ const productsRoutes = require('../products/products.routes');
 const cartRoutes = require('../cart/cart.routes');
 const discountRoutes = require('../discount/discount.routes');
 const paymentsRoutes = require('../payments/payments.routes');
+const commentRoutes = require('../comments/comments.routes');
 
 function routes(app) {
     // users
@@ -32,6 +33,10 @@ function routes(app) {
     app.get('/api/check-payment-momo', paymentsRoutes);
     app.get('/api/check-payment-vnpay', paymentsRoutes);
     app.get('/api/checkout', paymentsRoutes);
+
+    // comment
+    app.post('/api/add-comment', commentRoutes);
+    app.get('/api/comments', commentRoutes);
 }
 
 module.exports = routes;
