@@ -9,6 +9,15 @@ const path = require('path');
 const bodyParser = require('body-parser');
 const { jwtDecode } = require('jwt-decode');
 
+const http = require('http');
+const server = http.createServer(app);
+const { Server } = require('socket.io');
+const io = new Server(server);
+
+global._io = io;
+const userSockets = new Map();
+global._userSockets = userSockets;
+
 require('dotenv').config();
 
 app.use(cookieParser());
@@ -32,6 +41,13 @@ app.use((req, res, next) => {
 
 routes(app);
 
-app.listen(port, () => {
+io.on('connect', (socket) => {
+    socket.on('disconnect', () => {
+        console.log('user disconnected');
+        userSockets.set(socket.id, null);
+    });
+});
+
+server.listen(port, () => {
     console.log(`Example app listening on port ${port}`);
 });

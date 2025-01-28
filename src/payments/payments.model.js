@@ -9,8 +9,12 @@ const modelPayments = new Schema(
         fullName: { type: String, require: true },
         phone: { type: Number, require: true },
         address: { type: String, require: true },
-        status: { type: Boolean, require: true, default: false },
         typePayments: { type: String, enum: ['COD', 'MOMO', 'VNPAY'], default: 'COD', require: true },
+        statusOrder: {
+            type: String,
+            enum: ['pending', 'completed', 'shipping', 'delivered', 'cancelled'],
+            default: 'pending',
+        },
     },
     {
         timestamps: true,

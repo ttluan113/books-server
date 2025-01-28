@@ -4,6 +4,8 @@ const cartRoutes = require('../cart/cart.routes');
 const discountRoutes = require('../discount/discount.routes');
 const paymentsRoutes = require('../payments/payments.routes');
 const commentRoutes = require('../comments/comments.routes');
+const notifyRoutes = require('../notify/notify.routes');
+const messageRoutes = require('../messages/message.routes');
 
 function routes(app) {
     // users
@@ -12,6 +14,7 @@ function routes(app) {
     app.get('/api/logout', usersRoutes);
     app.post('/api/login', usersRoutes);
     app.get('/api/search-address', usersRoutes);
+    app.post('/api/edit-user', usersRoutes);
 
     // products
     app.post('/api/add-product', productsRoutes);
@@ -34,9 +37,19 @@ function routes(app) {
     app.get('/api/check-payment-vnpay', paymentsRoutes);
     app.get('/api/checkout', paymentsRoutes);
 
+    app.get('/api/history-order', paymentsRoutes);
+    app.post('/api/edit-order', paymentsRoutes);
+
     // comment
     app.post('/api/add-comment', commentRoutes);
     app.get('/api/comments', commentRoutes);
+
+    /// notify
+    app.post('/api/add-notify', notifyRoutes);
+    app.get('/api/notify', notifyRoutes);
+
+    // message
+    app.post('/api/create-message', messageRoutes);
 }
 
 module.exports = routes;

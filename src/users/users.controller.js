@@ -6,6 +6,7 @@ const joi = require('joi');
 const authUser = require('../services/authUser');
 const CryptoJS = require('crypto-js');
 const searchAddress = require('../utils/searchAddress');
+const fs = require('fs/promises');
 require('dotenv').config();
 
 const schemaRegister = joi.object({
@@ -96,6 +97,61 @@ class controllerUser {
 
         const result = await searchAddress(address);
         return res.status(200).json(result);
+    }
+
+    async editUser(req, res) {
+        try {
+            const { id } = req.decodedToken; // ID từ token đã giải mã
+
+            // Kiểm tra ID có tồn tại
+            if (!id) {
+                return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+            }
+
+            // Tìm người dùng hiện tại
+            const findUser = await modelUser.findOne({ _id: id });
+            if (!findUser) {
+                return res.status(404).json({ message: 'Người dùng không tồn tại' });
+            }
+
+            // Xử lý cập nhật avatar (nếu có)
+            if (req.file && req.file.filename) {
+                const img = req.file.filename;
+
+                // Xóa avatar cũ nếu có
+                if (findUser.avatar) {
+                    try {
+                        await fs.unlink(`src/uploads/avatars/${findUser.avatar}`);
+                    } catch (error) {
+                        console.warn(`Không thể xóa avatar cũ: ${findUser.avatar}`, error.message);
+                    }
+                }
+
+                // Cập nhật avatar mới
+                await modelUser.updateOne({ _id: id }, { avatar: img });
+            }
+
+            // Lấy thông tin từ body và bỏ qua các giá trị không hợp lệ
+            const { fullName, phone, address } = req.body;
+
+            const updatedFields = {};
+
+            if (fullName) updatedFields.fullName = fullName;
+            if (phone) updatedFields.phone = phone;
+            if (address) updatedFields.address = address;
+
+            // Cập nhật thông tin người dùng
+            const updatedUser = await modelUser.findOneAndUpdate({ _id: id }, updatedFields, { new: true });
+
+            // Trả về phản hồi
+            return res.status(200).json({
+                message: 'Cập nhật thông tin thành công',
+                user: updatedUser,
+            });
+        } catch (error) {
+            console.error('Error updating user:', error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra, vui lòng thử lại sau' });
+        }
     }
 }
 

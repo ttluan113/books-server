@@ -1,6 +1,8 @@
 const modelCart = require('../cart/cart.model');
 const modelPayments = require('./payments.model');
 const modelProducts = require('../products/products.model');
+const modelUser = require('../users/users.model');
+
 const axios = require('axios');
 const crypto = require('crypto');
 const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require('vnpay');
@@ -26,7 +28,6 @@ class controllerPayments {
                 products: findCart.products,
                 address: req.body.address,
                 phone: req.body.phone,
-                status: true,
                 typePayments: req.body.typePayments,
             });
             await newPayment.save();
@@ -135,7 +136,6 @@ class controllerPayments {
                 products: findCart.products,
                 address: findCart.address,
                 phone: findCart.phone,
-                status: true,
                 typePayments: 'MOMO',
             });
             await newPayment.save();
@@ -154,7 +154,6 @@ class controllerPayments {
                 products: findCart.products,
                 address: findCart.address,
                 phone: findCart.phone,
-                status: true,
                 typePayments: 'VNPAY',
             });
             await newPayment.save();
@@ -183,6 +182,90 @@ class controllerPayments {
             return res.status(200).json({ payment, data });
         } catch (error) {
             console.log(error);
+        }
+    }
+    async historyOrder(req, res) {
+        const { id } = req.decodedToken; // Lấy userId từ token
+        const { params } = req.query;
+
+        try {
+            // Tìm lịch sử đơn hàng của user
+            const historyOrder = await modelPayments.find({ userId: id, statusOrder: params });
+
+            // Tìm thông tin sản phẩm chi tiết
+            const data = await Promise.all(
+                historyOrder.map(async (order) => {
+                    const detailedProducts = await Promise.all(
+                        order.products.map(async (product) => {
+                            const findProduct = await modelProducts.findById(product.productId);
+                            return {
+                                ...findProduct.toObject(), // Chuyển document MongoDB thành object
+                                quantityUserBuy: product.quantity,
+                            };
+                        }),
+                    );
+                    return {
+                        ...order.toObject(),
+                        images: detailedProducts[0].images,
+                        name: detailedProducts[0].name,
+                        total: detailedProducts[0].price * detailedProducts[0].quantityUserBuy,
+                        quantity: detailedProducts[0].quantityUserBuy,
+                    };
+                }),
+            );
+
+            // Trả về kết quả
+            return res.status(200).json(data);
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: 'Internal Server Error' });
+        }
+    }
+
+    async editOrder(req, res) {
+        const { id } = req.decodedToken;
+        const { statusOrder, idOrder } = req.body;
+        if (!statusOrder || !idOrder) return res.status(400).json({ message: 'Thiếu thông tin' });
+
+        const findUser = await modelUser.findOne({ _id: id });
+        ///// users
+        if (statusOrder === 'cancelled') {
+            if (findUser.isAdmin === false) {
+                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+                const findOder = await modelPayments.findOne({ _id: idOrder });
+                await modelProducts.findOneAndUpdate(
+                    { _id: findOder.products[0].productId },
+                    { $inc: { quantity: findOder.products[0].quantity } },
+                );
+
+                return res.status(200).json({ message: 'Huỷ đơn hàng thành công' });
+            }
+        }
+
+        //// admin
+        if (statusOrder === 'delivered') {
+            if (findUser.isAdmin === true) {
+                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+                return res.status(200).json({ success: true });
+            }
+        }
+
+        if (statusOrder === 'completed') {
+            if (findUser.isAdmin === true) {
+                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+                return res.status(200).json({ success: true });
+            } else {
+                return res.status(400).json({ message: 'Bạn không có quyền' });
+            }
+        }
+
+        if (statusOrder === 'shipping') {
+            if (findUser.isAdmin === true) {
+                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+                return res.status(200).json({ success: true });
+            } else {
+                return res.status(400).json({ message: 'Bạn không có quyền' });
+            }
         }
     }
 }
