@@ -6,6 +6,7 @@ const paymentsRoutes = require('../payments/payments.routes');
 const commentRoutes = require('../comments/comments.routes');
 const notifyRoutes = require('../notify/notify.routes');
 const messageRoutes = require('../messages/message.routes');
+const feedbackRoutes = require('../feedback/feedback.routes');
 
 function routes(app) {
     // users
@@ -50,6 +51,10 @@ function routes(app) {
 
     // message
     app.post('/api/create-message', messageRoutes);
+
+    /// feedback
+    app.post('/api/add-feedback', feedbackRoutes);
+    app.get('/api/feedback', feedbackRoutes);
 }
 
 module.exports = routes;

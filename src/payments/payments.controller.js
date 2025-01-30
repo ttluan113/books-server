@@ -187,35 +187,63 @@ class controllerPayments {
     async historyOrder(req, res) {
         const { id } = req.decodedToken; // Lấy userId từ token
         const { params } = req.query;
+        const findUser = await modelUser.findOne({ _id: id });
+        if (!findUser) return res.status(400).json({ message: 'Người dùng không tồn tại' });
 
         try {
-            // Tìm lịch sử đơn hàng của user
-            const historyOrder = await modelPayments.find({ userId: id, statusOrder: params });
+            if (findUser.isAdmin === false) {
+                // Tìm lịch sử đơn hàng của user
+                const historyOrder = await modelPayments.find({ userId: id, statusOrder: params });
 
-            // Tìm thông tin sản phẩm chi tiết
-            const data = await Promise.all(
-                historyOrder.map(async (order) => {
-                    const detailedProducts = await Promise.all(
-                        order.products.map(async (product) => {
-                            const findProduct = await modelProducts.findById(product.productId);
-                            return {
-                                ...findProduct.toObject(), // Chuyển document MongoDB thành object
-                                quantityUserBuy: product.quantity,
-                            };
-                        }),
-                    );
-                    return {
-                        ...order.toObject(),
-                        images: detailedProducts[0].images,
-                        name: detailedProducts[0].name,
-                        total: detailedProducts[0].price * detailedProducts[0].quantityUserBuy,
-                        quantity: detailedProducts[0].quantityUserBuy,
-                    };
-                }),
-            );
+                // Tìm thông tin sản phẩm chi tiết
+                const data = await Promise.all(
+                    historyOrder.map(async (order) => {
+                        const detailedProducts = await Promise.all(
+                            order.products.map(async (product) => {
+                                const findProduct = await modelProducts.findById(product.productId);
+                                return {
+                                    ...findProduct.toObject(), // Chuyển document MongoDB thành object
+                                    quantityUserBuy: product.quantity,
+                                };
+                            }),
+                        );
+                        return {
+                            ...order.toObject(),
+                            images: detailedProducts[0].images,
+                            name: detailedProducts[0].name,
+                            total: detailedProducts[0].price * detailedProducts[0].quantityUserBuy,
+                            quantity: detailedProducts[0].quantityUserBuy,
+                        };
+                    }),
+                );
 
-            // Trả về kết quả
-            return res.status(200).json(data);
+                // Trả về kết quả
+                return res.status(200).json(data);
+            }
+            if (findUser.isAdmin === true) {
+                const historyOrder = await modelPayments.find({ statusOrder: params });
+                const data = await Promise.all(
+                    historyOrder.map(async (order) => {
+                        const detailedProducts = await Promise.all(
+                            order.products.map(async (product) => {
+                                const findProduct = await modelProducts.findById(product.productId);
+                                return {
+                                    ...findProduct.toObject(), // Chuyển document MongoDB thành object
+                                    quantityUserBuy: product.quantity,
+                                };
+                            }),
+                        );
+                        return {
+                            ...order.toObject(),
+                            images: detailedProducts[0].images,
+                            name: detailedProducts[0].name,
+                            total: detailedProducts[0].price * detailedProducts[0].quantityUserBuy,
+                            quantity: detailedProducts[0].quantityUserBuy,
+                        };
+                    }),
+                );
+                return res.status(200).json(data);
+            }
         } catch (error) {
             console.error(error);
             return res.status(500).json({ message: 'Internal Server Error' });
@@ -245,14 +273,19 @@ class controllerPayments {
         //// admin
         if (statusOrder === 'delivered') {
             if (findUser.isAdmin === true) {
-                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+                const product = await modelPayments.findOneAndUpdate({ _id: idOrder }, { statusOrder });
+
+                await modelProducts.findOneAndUpdate(
+                    { _id: product.products[0].productId },
+                    { $inc: { countBuy: +product.products[0].quantity } },
+                );
                 return res.status(200).json({ success: true });
             }
         }
 
         if (statusOrder === 'completed') {
             if (findUser.isAdmin === true) {
-                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+                await modelPayments.findOneAndUpdate({ _id: idOrder }, { statusOrder });
                 return res.status(200).json({ success: true });
             } else {
                 return res.status(400).json({ message: 'Bạn không có quyền' });
@@ -261,7 +294,7 @@ class controllerPayments {
 
         if (statusOrder === 'shipping') {
             if (findUser.isAdmin === true) {
-                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+                await modelPayments.findOneAndUpdate({ _id: idOrder }, { statusOrder });
                 return res.status(200).json({ success: true });
             } else {
                 return res.status(400).json({ message: 'Bạn không có quyền' });

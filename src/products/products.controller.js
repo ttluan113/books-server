@@ -1,4 +1,6 @@
 const modelProducts = require('./products.model');
+const modelFeedback = require('../feedback/feedback.model');
+const modelUser = require('../users/users.model');
 
 class controllerProducts {
     async addProduct(req, res, next) {
@@ -65,17 +67,36 @@ class controllerProducts {
     async getProduct(req, res, next) {
         try {
             const { id } = req.query;
-            const product = await modelProducts.findById(id);
-            const brandProducts = await modelProducts.find({ 'options.company': product?.options?.company });
-            const data = {
-                product,
-                brandProducts,
-            };
-            return res.status(200).json(data);
-        } catch (error) {
-            console.log(error);
 
-            return res.status(500).json({ message: 'Server error !!!' });
+            // Tìm sản phẩm theo ID
+            const product = await modelProducts.findById(id);
+            if (!product) {
+                return res.status(404).json({ message: 'Sản phẩm không tồn tại' });
+            }
+
+            // Lấy danh sách sản phẩm cùng thương hiệu
+            const brandProducts = await modelProducts.find({ 'options.company': product.options?.company });
+
+            // Lấy danh sách feedback
+            const feedback = await modelFeedback.find({ productId: id });
+
+            // Xử lý thông tin người dùng cho từng feedback
+            const feedbackUser = await Promise.all(
+                feedback.map(async (item) => {
+                    const findUser = await modelUser.findById(item.userId);
+                    return {
+                        ...item._doc,
+                        name: findUser?.fullName || 'Người dùng ẩn danh',
+                        avatar: findUser?.avatar || null,
+                    };
+                }),
+            );
+
+            // Trả về kết quả
+            return res.status(200).json({ product, brandProducts, feedbackUser });
+        } catch (error) {
+            console.error('Lỗi khi lấy dữ liệu sản phẩm:', error);
+            return res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau' });
         }
     }
 }

@@ -41,11 +41,33 @@ app.use((req, res, next) => {
 
 routes(app);
 
-io.on('connect', (socket) => {
-    socket.on('disconnect', () => {
-        console.log('user disconnected');
-        userSockets.set(socket.id, null);
-    });
+app.use((req, res, next) => {
+    res.io = io;
+    next();
+});
+
+io.on('connection', (socket) => {
+    const token = socket.handshake.headers.cookie
+        ?.split(';')
+        .find((cookie) => cookie.trim().startsWith('token='))
+        ?.split('=')[1]; // Optional chaining để tránh lỗi nếu không có token
+
+    if (!token) {
+        console.log('No token found!');
+        socket.disconnect(); // Nếu không có token, ngắt kết nối
+        return;
+    }
+    try {
+        const { id } = jwtDecode(token);
+        socket.user = id;
+        console.log('a user connected' + id);
+        userSockets.set(id, socket);
+        socket.on('disconnect', () => {
+            console.log('user disconnected');
+        });
+    } catch (error) {
+        console.log(error);
+    }
 });
 
 server.listen(port, () => {

@@ -16,4 +16,4 @@ const modelNotify = new Schema(
     },
 );
 
-module.exports = mongoose.model('notify', modelNotify);
+module.exports = mongoose.model('notication', modelNotify);
