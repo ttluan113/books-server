@@ -7,6 +7,7 @@ const commentRoutes = require('../comments/comments.routes');
 const notifyRoutes = require('../notify/notify.routes');
 const messageRoutes = require('../messages/message.routes');
 const feedbackRoutes = require('../feedback/feedback.routes');
+const categoryRoutes = require('../category/category.routes');
 
 function routes(app) {
     // users
@@ -21,6 +22,10 @@ function routes(app) {
     app.post('/api/add-product', productsRoutes);
     app.get('/api/get-products', productsRoutes);
     app.get('/api/get-product', productsRoutes);
+
+    ///// category
+    app.post('/api/add-category', categoryRoutes);
+    app.get('/api/category', categoryRoutes);
 
     /// carts
     app.post('/api/add-cart', cartRoutes);
@@ -48,9 +53,11 @@ function routes(app) {
     /// notify
     app.post('/api/add-notify', notifyRoutes);
     app.get('/api/notify', notifyRoutes);
+    app.post('/api/read-all-notify', notifyRoutes);
 
     // message
     app.post('/api/create-message', messageRoutes);
+    app.get('/api/messages', messageRoutes);
 
     /// feedback
     app.post('/api/add-feedback', feedbackRoutes);

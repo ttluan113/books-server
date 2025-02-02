@@ -2,13 +2,26 @@ const modelProducts = require('./products.model');
 const modelFeedback = require('../feedback/feedback.model');
 const modelUser = require('../users/users.model');
 
+const slugify = require('slugify');
+
 class controllerProducts {
     async addProduct(req, res, next) {
         try {
             const file = req.files;
 
-            const { name, price, description, quantity, company, publicationDate, type, size, page, publishingHouse } =
-                req.body;
+            const {
+                name,
+                price,
+                description,
+                quantity,
+                company,
+                publicationDate,
+                type,
+                size,
+                page,
+                publishingHouse,
+                category,
+            } = req.body;
 
             if (
                 !file ||
@@ -21,13 +34,23 @@ class controllerProducts {
                 !type ||
                 !size ||
                 !page ||
-                !publishingHouse
+                !publishingHouse ||
+                !category
             ) {
                 return res.status(400).json({ message: 'Bạn đang thiếu thông tin !!!' });
             }
 
             const images = file.map((item) => {
                 return item.filename;
+            });
+
+            const slugCategory = slugify(category, {
+                replacement: '-', // thay thế khoảng trắng bằng ký tự thay thế, mặc định là `-`
+                remove: undefined, // xóa các ký tự khớp với regex, mặc định là `undefined`
+                lower: false, // chuyển thành chữ thường, mặc định là `false`
+                strict: false, // xóa các ký tự đặc biệt ngoại trừ replacement, mặc định là `false`
+                locale: 'vi', // mã ngôn ngữ của bản địa cần sử dụng
+                trim: true, // cắt các ký tự thay thế ở đầu và cuối, mặc định là `true`
             });
 
             const newProduct = new modelProducts({
@@ -45,6 +68,7 @@ class controllerProducts {
                     publishingHouse,
                 },
                 countBuy: 0,
+                category: slugCategory,
             });
             await newProduct.save();
             return res.status(201).json({ message: 'Thêm sản phẩm thành công !!!' });

@@ -83,6 +83,33 @@ class controllerNotify {
             return res.status(500).json({ message: 'Đã xảy ra lỗi máy chủ' });
         }
     }
+
+    async readNotify(req, res) {
+        try {
+            const { id } = req.decodedToken;
+            const { type, idNotify } = req.body;
+            if (type === 'all') {
+                if (!id) {
+                    return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+                }
+                const findUser = await modelUser.findOne({ _id: id });
+                if (findUser.isAdmin === true) {
+                    await modelNotify.updateMany({ receiverId: null }, { isRead: true });
+                    return res.status(200).json({ message: 'Thành công' });
+                }
+
+                await modelNotify.updateMany({ receiverId: id }, { isRead: true });
+                return res.status(200).json({ message: 'Thành công' });
+            }
+            if (type === 'one') {
+                await modelNotify.updateOne({ _id: idNotify }, { isRead: true });
+                return res.status(200).json({ message: 'Thành công' });
+            }
+        } catch (error) {
+            console.error('Lỗi khi lấy thông báo:', error);
+            return res.status(500).json({ message: 'Đã xảy ra lỗi máy chủ' });
+        }
+    }
 }
 
 module.exports = new controllerNotify();
