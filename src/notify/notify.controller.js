@@ -60,7 +60,7 @@ class controllerNotify {
                         };
                     }),
                 );
-                return res.status(200).json(userNotifications);
+                return res.status(200).json(userNotifications || []);
             }
 
             const notify = await modelNotify.find({ receiverId: id });
@@ -77,7 +77,7 @@ class controllerNotify {
                 }),
             );
 
-            return res.status(200).json(userNotifications);
+            return res.status(200).json(userNotifications || []);
         } catch (error) {
             console.error('Lỗi khi lấy thông báo:', error);
             return res.status(500).json({ message: 'Đã xảy ra lỗi máy chủ' });

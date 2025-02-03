@@ -21,4 +21,8 @@ router.post('/api/add-product', upload.array('images'), controllerProducts.addPr
 router.get('/api/get-products', controllerProducts.getProducts);
 router.get('/api/get-product', controllerProducts.getProduct);
 
+router.delete('/api/delete-product', controllerProducts.deleteProduct);
+
+router.post('/api/edit-product', upload.array('images'), controllerProducts.editProduct);
+
 module.exports = router;

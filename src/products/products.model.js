@@ -10,6 +10,7 @@ const modelProducts = new Schema(
         description: { type: String, require: true },
         quantity: { type: Number, require: true },
         category: { type: String, require: true, ref: 'category' },
+        discount: { type: Number, require: true, default: 0 },
         options: {
             company: { type: String, require: true },
             publicationDate: { type: String, require: true },

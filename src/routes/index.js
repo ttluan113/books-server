@@ -22,6 +22,9 @@ function routes(app) {
     app.post('/api/add-product', productsRoutes);
     app.get('/api/get-products', productsRoutes);
     app.get('/api/get-product', productsRoutes);
+    app.delete('/api/delete-product', productsRoutes);
+
+    app.post('/api/edit-product', productsRoutes);
 
     ///// category
     app.post('/api/add-category', categoryRoutes);
@@ -36,6 +39,8 @@ function routes(app) {
     /// discount
     app.post('/api/add-discount', discountRoutes);
     app.post('/api/add-user-discount', discountRoutes);
+    app.get('/api/discount', discountRoutes);
+    app.delete('/api/delete-discount', discountRoutes);
 
     /// payments
     app.post('/api/payment', paymentsRoutes);
@@ -58,6 +63,7 @@ function routes(app) {
     // message
     app.post('/api/create-message', messageRoutes);
     app.get('/api/messages', messageRoutes);
+    app.get('/api/message', messageRoutes);
 
     /// feedback
     app.post('/api/add-feedback', feedbackRoutes);

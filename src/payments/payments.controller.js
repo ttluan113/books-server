@@ -258,16 +258,14 @@ class controllerPayments {
         const findUser = await modelUser.findOne({ _id: id });
         ///// users
         if (statusOrder === 'cancelled') {
-            if (findUser.isAdmin === false) {
-                await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
-                const findOder = await modelPayments.findOne({ _id: idOrder });
-                await modelProducts.findOneAndUpdate(
-                    { _id: findOder.products[0].productId },
-                    { $inc: { quantity: findOder.products[0].quantity } },
-                );
+            await modelPayments.findOneAndUpdate({ userId: id, _id: idOrder }, { statusOrder });
+            const findOder = await modelPayments.findOne({ _id: idOrder });
+            await modelProducts.findOneAndUpdate(
+                { _id: findOder.products[0].productId },
+                { $inc: { quantity: findOder.products[0].quantity } },
+            );
 
-                return res.status(200).json({ message: 'Huỷ đơn hàng thành công' });
-            }
+            return res.status(200).json({ message: 'Huỷ đơn hàng thành công' });
         }
 
         //// admin

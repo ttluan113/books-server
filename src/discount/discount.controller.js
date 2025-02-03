@@ -94,6 +94,21 @@ class controllerDiscount {
 
         return res.status(200).json({ message: 'Thêm mã giảm giá thành công' });
     }
+
+    async getAllDiscount(req, res) {
+        const discount = await modelDiscount.find();
+        return res.status(200).json(discount);
+    }
+
+    async deleteDiscount(req, res) {
+        const { idDiscount } = req.query;
+        try {
+            await modelDiscount.findByIdAndDelete(idDiscount);
+            return res.status(200).json({ message: 'Xoá thành công ' });
+        } catch (error) {
+            console.log(error);
+        }
+    }
 }
 
 module.exports = new controllerDiscount();
