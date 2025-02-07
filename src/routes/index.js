@@ -8,6 +8,7 @@ const notifyRoutes = require('../notify/notify.routes');
 const messageRoutes = require('../messages/message.routes');
 const feedbackRoutes = require('../feedback/feedback.routes');
 const categoryRoutes = require('../category/category.routes');
+const discountProductRoutes = require('../discountProduct/discountProduct.routes');
 
 function routes(app) {
     // users
@@ -17,18 +18,21 @@ function routes(app) {
     app.post('/api/login', usersRoutes);
     app.get('/api/search-address', usersRoutes);
     app.post('/api/edit-user', usersRoutes);
+    app.get('/api/refresh-token', usersRoutes);
 
     // products
     app.post('/api/add-product', productsRoutes);
     app.get('/api/get-products', productsRoutes);
     app.get('/api/get-product', productsRoutes);
     app.delete('/api/delete-product', productsRoutes);
-
     app.post('/api/edit-product', productsRoutes);
+    app.get('/api/product-top-buy', productsRoutes);
 
     ///// category
     app.post('/api/add-category', categoryRoutes);
     app.get('/api/category', categoryRoutes);
+    app.delete('/api/delete-category', categoryRoutes);
+    app.post('/api/edit-category', categoryRoutes);
 
     /// carts
     app.post('/api/add-cart', cartRoutes);
@@ -68,6 +72,10 @@ function routes(app) {
     /// feedback
     app.post('/api/add-feedback', feedbackRoutes);
     app.get('/api/feedback', feedbackRoutes);
+
+    //// discount product
+    app.post('/api/create-discount-product', discountProductRoutes);
+    app.get('/api/get-discount-product', discountProductRoutes);
 }
 
 module.exports = routes;

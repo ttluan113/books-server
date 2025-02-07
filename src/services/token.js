@@ -1,16 +1,55 @@
 const jwt = require('jsonwebtoken');
+const modelApiKey = require('../apikey/apikey.model');
+const crypto = require('crypto');
 require('dotenv').config();
 
-const createToken = (payload) => {
-    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
+const createApiKey = async (userId) => {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+
+    const privateKeyString = privateKey.export({ type: 'pkcs8', format: 'pem' });
+    const publicKeyString = publicKey.export({ type: 'spki', format: 'pem' });
+
+    const newApiKey = new modelApiKey({ userId, publicKey: publicKeyString, privateKey: privateKeyString });
+    return await newApiKey.save();
 };
 
-const createRefreshToken = (payload) => {
-    return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+const createToken = async (payload) => {
+    const findApiKey = await modelApiKey.findOne({ userId: payload.id.toString() });
+
+    if (!findApiKey?.privateKey) {
+        throw new Error('Private key not found for user');
+    }
+
+    return jwt.sign(payload, findApiKey.privateKey, {
+        algorithm: 'RS256', // Quan trọng: Phải chỉ định thuật toán khi dùng RSA
+        expiresIn: '15m',
+    });
 };
 
-const verifyToken = (token) => {
-    return jwt.verify(token, process.env.JWT_SECRET);
+const createRefreshToken = async (payload) => {
+    const findApiKey = await modelApiKey.findOne({ userId: payload.id.toString() });
+
+    if (!findApiKey?.privateKey) {
+        throw new Error('Private key not found for user');
+    }
+
+    return jwt.sign(payload, findApiKey.privateKey, {
+        algorithm: 'RS256',
+        expiresIn: '7d',
+    });
 };
 
-module.exports = { createToken, createRefreshToken, verifyToken };
+const verifyToken = async (token, userId) => {
+    const findApiKey = await modelApiKey.findOne({ userId });
+    try {
+        if (!findApiKey?.publicKey) {
+            throw new Error('Public key not found for user');
+        }
+
+        return jwt.verify(token, findApiKey.publicKey, { algorithms: ['RS256'] });
+    } catch (error) {
+        console.log(error);
+    }
+};
+
+module.exports = { createToken, createRefreshToken, verifyToken, createApiKey };

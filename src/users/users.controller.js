@@ -1,12 +1,17 @@
 const modelUser = require('./users.model');
+const modelApiKey = require('../apikey/apikey.model');
+
 const bcrypt = require('bcrypt');
 const sendMailVerifyAccount = require('../services/sendMailVerifyAccount');
-const { createToken, createRefreshToken } = require('../services/token');
+const { createToken, createRefreshToken, createApiKey } = require('../services/token');
 const joi = require('joi');
-const authUser = require('../services/authUser');
 const CryptoJS = require('crypto-js');
 const searchAddress = require('../utils/searchAddress');
 const fs = require('fs/promises');
+
+const { jwtDecode } = require('jwt-decode');
+const { verifyToken } = require('../services/token');
+
 require('dotenv').config();
 
 const schemaRegister = joi.object({
@@ -35,9 +40,11 @@ class controllerUser {
         const hashPassword = await bcrypt.hash(password, salt);
         const newUser = new modelUser({ fullName, email, password: hashPassword, phone });
         await newUser.save();
+        await createApiKey(newUser._id);
         // await sendMailVerifyAccount(email);
-        const accessToken = createToken({ id: newUser._id, isAdmin: newUser.isAdmin });
-        const refreshToken = createRefreshToken({ id: newUser._id, isAdmin: newUser.isAdmin });
+        const accessToken = await createToken({ id: newUser._id, isAdmin: newUser.isAdmin });
+        const refreshToken = await createRefreshToken({ id: newUser._id, isAdmin: newUser.isAdmin });
+
         return res
             .setHeader('Set-Cookie', [
                 `token=${accessToken}; HttpOnly; Secure; Max-Age=86400; Path=/; SameSite=Strict`,
@@ -49,25 +56,39 @@ class controllerUser {
     }
 
     async auth(req, res) {
-        const dataUser = authUser(req.cookies);
-        if (!dataUser) {
-            return res.status(401).json({ message: 'Unauthorized' });
+        try {
+            const { id } = req.decodedToken;
+            if (!id) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+            const user = await modelUser.findOne({ _id: id });
+            const userString = JSON.stringify(user);
+            const auth = CryptoJS.AES.encrypt(userString, process.env.SECRET_KEY).toString();
+            return res.status(200).json({ auth });
+        } catch (error) {
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
         }
-        const user = await modelUser.findOne({ _id: dataUser.id });
-        const userString = JSON.stringify(user);
-        const auth = CryptoJS.AES.encrypt(userString, process.env.SECRET_KEY).toString();
-        return res.status(200).json({ auth });
     }
 
     async logOut(req, res) {
-        return res
-            .setHeader('Set-Cookie', [
-                `token=${''}; HttpOnly; Secure; Max-Age=0; Path=/; SameSite=Strict`,
-                `refreshToken=${''}; HttpOnly; Secure; Max-Age=0; Path=/; SameSite=Strict`,
-                `logged=${0}; Max-Age=0; Path=/; SameSite=Lax`,
-            ])
-            .status(200)
-            .json({ message: 'Đăng xuất thành công !!!' });
+        const { id } = req.decodedToken;
+        if (!id) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+        try {
+            await modelApiKey.deleteOne({ userId: id });
+
+            return res
+                .setHeader('Set-Cookie', [
+                    `token=; HttpOnly; Secure; Max-Age=0; Path=/; SameSite=Strict`,
+                    `refreshToken=; HttpOnly; Secure; Max-Age=0; Path=/; SameSite=Strict`,
+                    `logged=; Max-Age=0; Path=/; SameSite=Lax`,
+                ])
+                .status(200)
+                .json({ message: 'Đăng xuất thành công' });
+        } catch (error) {
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
     }
 
     async login(req, res) {
@@ -80,11 +101,15 @@ class controllerUser {
         if (!isMatch) {
             return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không đúng' });
         }
-        const accessToken = createToken({ id: user._id, isAdmin: user.isAdmin });
-        const refreshToken = createRefreshToken({ id: user._id, isAdmin: user.isAdmin });
+        const findApiKey = await modelApiKey.findOne({ userId: user._id });
+        if (!findApiKey) {
+            await createApiKey(user._id);
+        }
+        const accessToken = await createToken({ id: user._id, isAdmin: user.isAdmin });
+        const refreshToken = await createRefreshToken({ id: user._id, isAdmin: user.isAdmin });
         return res
             .setHeader('Set-Cookie', [
-                `token=${accessToken}; HttpOnly; Secure; Max-Age=86400; Path=/; SameSite=Strict`,
+                `token=${accessToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`,
                 `refreshToken=${refreshToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`, // 7 ngày cho refreshToken
                 `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
             ])
@@ -151,6 +176,35 @@ class controllerUser {
         } catch (error) {
             console.error('Error updating user:', error);
             return res.status(500).json({ message: 'Có lỗi xảy ra, vui lòng thử lại sau' });
+        }
+    }
+
+    async refreshToken(req, res) {
+        try {
+            const { refreshToken } = req.cookies;
+            if (!refreshToken) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+            const { id } = jwtDecode(refreshToken);
+            const findApiKey = await modelApiKey.findOne({ userId: id });
+            if (!findApiKey) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+            const validToken = verifyToken(refreshToken, id);
+            if (!validToken) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+            const findUser = await modelUser.findOne({ _id: id });
+            const accessToken = await createToken({ id: findUser._id, isAdmin: findUser.isAdmin });
+            return res
+                .setHeader('Set-Cookie', [
+                    `token=${accessToken}; HttpOnly; Secure; Max-Age=86400; Path=/; SameSite=Strict`,
+                    `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
+                ])
+                .status(200)
+                .json({ message: 'Refresh token thành công !!!' });
+        } catch (error) {
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
         }
     }
 }

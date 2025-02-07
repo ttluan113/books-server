@@ -20,6 +20,8 @@ const modelProducts = new Schema(
             publishingHouse: { type: String, require: true },
         },
         countBuy: { type: Number, require: true },
+
+        dateEnd: { type: Date },
     },
     {
         timestamps: true,

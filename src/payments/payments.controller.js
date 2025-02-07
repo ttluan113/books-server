@@ -188,6 +188,7 @@ class controllerPayments {
         const { id } = req.decodedToken; // Lấy userId từ token
         const { params } = req.query;
         const findUser = await modelUser.findOne({ _id: id });
+
         if (!findUser) return res.status(400).json({ message: 'Người dùng không tồn tại' });
 
         try {
@@ -227,6 +228,7 @@ class controllerPayments {
                         const detailedProducts = await Promise.all(
                             order.products.map(async (product) => {
                                 const findProduct = await modelProducts.findById(product.productId);
+
                                 return {
                                     ...findProduct.toObject(), // Chuyển document MongoDB thành object
                                     quantityUserBuy: product.quantity,
@@ -242,6 +244,7 @@ class controllerPayments {
                         };
                     }),
                 );
+
                 return res.status(200).json(data);
             }
         } catch (error) {

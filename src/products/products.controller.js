@@ -1,10 +1,9 @@
 const modelProducts = require('./products.model');
 const modelFeedback = require('../feedback/feedback.model');
 const modelUser = require('../users/users.model');
+const modelCategory = require('../category/category.model');
 
 const fs = require('fs/promises');
-
-const slugify = require('slugify');
 
 class controllerProducts {
     async addProduct(req, res, next) {
@@ -46,14 +45,7 @@ class controllerProducts {
                 return item.filename;
             });
 
-            const slugCategory = slugify(category, {
-                replacement: '-', // thay thế khoảng trắng bằng ký tự thay thế, mặc định là `-`
-                remove: undefined, // xóa các ký tự khớp với regex, mặc định là `undefined`
-                lower: true, // chuyển thành chữ thường, mặc định là `false`
-                strict: false, // xóa các ký tự đặc biệt ngoại trừ replacement, mặc định là `false`
-                locale: 'vi', // mã ngôn ngữ của bản địa cần sử dụng
-                trim: true, // cắt các ký tự thay thế ở đầu và cuối, mặc định là `true`
-            });
+            const findCategory = await modelCategory.findOne({ nameCategory: category });
 
             const newProduct = new modelProducts({
                 images,
@@ -71,7 +63,7 @@ class controllerProducts {
                 },
 
                 countBuy: 0,
-                category: slugCategory,
+                category: findCategory._id,
             });
             await newProduct.save();
             return res.status(201).json({ message: 'Thêm sản phẩm thành công !!!' });
@@ -82,9 +74,50 @@ class controllerProducts {
     }
 
     async getProducts(req, res, next) {
+        const { sortType, category, page, limit } = req.query;
+        const skip = (page - 1) * limit;
+
         try {
-            const products = await modelProducts.find();
-            return res.status(200).json(products);
+            let filter = {};
+            if (category) {
+                filter.category = category; // Lọc theo danh mục nếu có
+            }
+
+            let sortOption = {};
+            if (sortType === 'price_desc') {
+                sortOption.price = -1;
+            } else if (sortType === 'price_asc') {
+                sortOption.price = 1;
+            } else if (sortType === 'top_buy') {
+                sortOption.countBuy = -1;
+            } else if (sortType === 'sale') {
+                filter.discount = { $gt: 0 }; // Chỉ lấy sản phẩm đang giảm giá
+            }
+
+            // Lấy danh sách sản phẩm theo bộ lọc và sắp xếp
+            const products = await modelProducts
+                .find(filter)
+                .sort(sortOption)
+                .populate('category', 'nameCategory')
+                .limit(limit)
+                .skip(skip);
+
+            /// get feedback
+            const valueRating = await modelFeedback.aggregate([
+                {
+                    $group: { _id: '$productId', avgRating: { $avg: '$rating' } },
+                },
+            ]);
+
+            // Tính toán giá sau khi giảm giá
+            const data = products.map((item) => ({
+                ...item._doc,
+                nameCategory: item.category?.nameCategory,
+                price: item.price - (item.price * item.discount) / 100,
+                rating: valueRating.find((value) => value._id.toString() === item._id.toString())?.avgRating || 0,
+            }));
+
+            return res.status(200).json(data);
         } catch (error) {
             console.log(error);
             return res.status(500).json({ message: 'Server error !!!' });
@@ -96,7 +129,11 @@ class controllerProducts {
             const { id } = req.query;
 
             // Tìm sản phẩm theo ID
-            const product = await modelProducts.findById(id);
+            const dataProduct = await modelProducts.findById(id);
+            const product = {
+                ...dataProduct._doc,
+                price: dataProduct.price - (dataProduct.price * dataProduct.discount) / 100,
+            };
             if (!product) {
                 return res.status(404).json({ message: 'Sản phẩm không tồn tại' });
             }
@@ -143,7 +180,6 @@ class controllerProducts {
             }
             return res.status(200).json({ message: 'Xóa sản phẩm thành công' });
         } catch (error) {
-            console.log(error);
             return res.status(500).json({ message: 'Server error !!!' });
         }
     }
@@ -188,6 +224,16 @@ class controllerProducts {
             // await product.save();
             // return res.status(200).json({ message: 'Chiềnh sách sản phẩm thành cong' });
             console.log(req.body);
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json({ message: 'Server error !!!' });
+        }
+    }
+
+    async getProductsTopBuy(req, res, next) {
+        try {
+            const products = await modelProducts.find().sort({ countBuy: -1 }).limit(5);
+            return res.status(200).json(products);
         } catch (error) {
             console.log(error);
             return res.status(500).json({ message: 'Server error !!!' });

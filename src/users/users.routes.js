@@ -23,5 +23,6 @@ router.get('/api/logout', controllerUser.logOut);
 router.post('/api/login', controllerUser.login);
 router.get('/api/search-address', controllerUser.searchAddress);
 router.post('/api/edit-user', upload.single('avatar'), controllerUser.editUser);
+router.get('/api/refresh-token', controllerUser.refreshToken);
 
 module.exports = router;

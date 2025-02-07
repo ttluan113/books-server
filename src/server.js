@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 const path = require('path');
 const bodyParser = require('body-parser');
 const { jwtDecode } = require('jwt-decode');
+const { verifyToken } = require('./services/token');
 
 const http = require('http');
 const server = http.createServer(app);
@@ -29,22 +30,39 @@ connectDB();
 app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.static(path.join(__dirname, '../src')));
 
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
     const token = req.cookies.token;
-
-    if (token) {
-        const decodedToken = jwtDecode(token);
-        req.decodedToken = decodedToken;
+    const refreshToken = req.cookies.refreshToken;
+    if (!token && !refreshToken) {
+        return next();
     }
+    if (token) {
+        try {
+            const decodedToken = await jwtDecode(token);
+            const validToken = await verifyToken(token, decodedToken.id);
+
+            if (!validToken) {
+                res.clearCookie('token');
+
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+            if (validToken) {
+                req.decodedToken = validToken;
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    }
+
     next();
 });
-
-routes(app);
 
 app.use((req, res, next) => {
     res.io = io;
     next();
 });
+
+routes(app);
 
 io.on('connection', (socket) => {
     const token = socket.handshake.headers.cookie

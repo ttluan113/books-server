@@ -1,12 +1,8 @@
 const jwt = require('jsonwebtoken');
+const modelApiKeys = require('../apiKeys/apiKeys.model');
+const { verifyToken } = require('../services/token');
+const cookieParser = require('cookie-parser');
 
-const auth = async (req, res, next) => {
-    try {
-        const token = req.cookies;
-        const decoded = jwt.verify(token, 'secret');
-        req.user = decoded;
-        next();
-    } catch (error) {
-        res.status(401).send({ error: 'Please authenticate' });
-    }
-};
+const auth = async (req, res, next) => {};
+
+module.exports = auth;

@@ -3,45 +3,50 @@ const modelProducts = require('../products/products.model');
 const modelDiscount = require('../discount/discount.model');
 class controllerCart {
     async addCart(req, res) {
-        const { id } = req.decodedToken;
+        try {
+            const { id } = req.decodedToken;
+            if (!id) {
+                return res.status(403).json({ message: 'Vui lòng đăng nhập ' });
+            }
+            const { productId, quantity } = req.body;
 
-        if (!id) {
-            return res.status(403).json({ message: 'Vui lòng đăng nhập ' });
-        }
-        const { productId, quantity } = req.body;
-        const findProduct = await modelProducts.findById(productId);
+            const findProduct = await modelProducts.findById(productId);
+            const cart = await modelCart.findOne({ userId: id });
 
-        if (!findProduct) {
-            return res.status(400).json({ message: 'Sản phẩm không tồn tại' });
-        }
-        if (quantity > findProduct.quantity) {
-            return res.status(400).json({ message: 'Sản phẩm trong kho không đủ ' });
-        }
+            if (!findProduct) {
+                return res.status(400).json({ message: 'Sản phẩm không tồn tại' });
+            }
+            if (quantity > findProduct.quantity) {
+                return res.status(400).json({ message: 'Sản phẩm trong kho không đủ ' });
+            }
 
-        const cart = await modelCart.findOne({ userId: id });
-        if (!cart) {
-            const newCart = new modelCart({
-                userId: id,
-                products: [{ productId, quantity }],
-                total: findProduct.price * quantity,
-            });
-            await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
+            if (!cart) {
+                const newCart = new modelCart({
+                    userId: id,
+                    products: [{ productId, quantity }],
+                    total: findProduct.price * quantity,
+                });
+                await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
 
-            await newCart.save();
+                await newCart.save();
+                return res.status(200).json({ message: 'Thêm vào giỏ hàng thành công ' });
+            }
+            const index = cart.products.findIndex((item) => item.productId === productId);
+            if (index !== -1) {
+                cart.products[index].quantity += quantity;
+                await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
+                await cart.updateOne({ total: cart.total + findProduct.price * quantity });
+            } else {
+                cart.products.push({ productId, quantity });
+                await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
+                await cart.updateOne({ total: cart.total + findProduct.price * quantity });
+            }
+            await cart.save();
             return res.status(200).json({ message: 'Thêm vào giỏ hàng thành công ' });
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json({ message: 'Lỗi hệ thống', error: error.message });
         }
-        const index = cart.products.findIndex((item) => item.productId === productId);
-        if (index !== -1) {
-            cart.products[index].quantity += quantity;
-            await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
-            await cart.updateOne({ total: cart.total + findProduct.price * quantity });
-        } else {
-            cart.products.push({ productId, quantity });
-            await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
-            await cart.updateOne({ total: cart.total + findProduct.price * quantity });
-        }
-        await cart.save();
-        return res.status(200).json({ message: 'Thêm vào giỏ hàng thành công ' });
     }
 
     async getCart(req, res) {
@@ -89,7 +94,6 @@ class controllerCart {
             return res.status(200).json({ data, total: cart.total, discount });
         } catch (error) {
             console.log(error);
-
             return res.status(500).json({ message: 'Lỗi hệ thống', error: error.message });
         }
     }
