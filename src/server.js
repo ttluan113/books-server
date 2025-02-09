@@ -32,29 +32,21 @@ app.use(express.static(path.join(__dirname, '../src')));
 
 app.use(async (req, res, next) => {
     const token = req.cookies.token;
-    const refreshToken = req.cookies.refreshToken;
-    if (!token && !refreshToken) {
-        return next();
-    }
-    if (token) {
-        try {
+
+    try {
+        if (token) {
             const decodedToken = await jwtDecode(token);
             const validToken = await verifyToken(token, decodedToken.id);
-
             if (!validToken) {
                 res.clearCookie('token');
-
                 return res.status(401).json({ message: 'Unauthorized' });
             }
-            if (validToken) {
-                req.decodedToken = validToken;
-            }
-        } catch (error) {
-            console.log(error);
+            req.decodedToken = validToken;
         }
+        return next();
+    } catch (error) {
+        console.error('Token verification error:', error);
     }
-
-    next();
 });
 
 app.use((req, res, next) => {

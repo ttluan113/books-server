@@ -58,13 +58,10 @@ class controllerUser {
     async auth(req, res) {
         try {
             const { id } = req.decodedToken;
-            if (!id) {
-                return res.status(401).json({ message: 'Unauthorized' });
-            }
             const user = await modelUser.findOne({ _id: id });
             const userString = JSON.stringify(user);
             const auth = CryptoJS.AES.encrypt(userString, process.env.SECRET_KEY).toString();
-            return res.status(200).json({ auth });
+            return res.status(201).json(auth);
         } catch (error) {
             return res.status(500).json({ message: 'Có lỗi xảy ra' });
         }

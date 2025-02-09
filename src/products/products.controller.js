@@ -72,54 +72,61 @@ class controllerProducts {
             return res.status(400).json({ message: 'Server error !!!' });
         }
     }
-
     async getProducts(req, res, next) {
-        const { sortType, category, page, limit } = req.query;
-        const skip = (page - 1) * limit;
-
         try {
+            let { sortType, category, page = 1, limit = 10 } = req.query;
+
+            // Chuyển đổi page và limit thành số nguyên hợp lệ
+            page = Math.max(parseInt(page) || 1, 1);
+            limit = Math.min(Math.max(parseInt(limit) || 10, 1), 100);
+            const skip = (page - 1) * limit;
+
+            // Tạo bộ lọc sản phẩm
             let filter = {};
-            if (category) {
-                filter.category = category; // Lọc theo danh mục nếu có
-            }
+            if (category) filter.category = category;
+            if (sortType === 'sale') filter.discount = { $gt: 0 }; // Lọc sản phẩm có giảm giá
 
+            // Tạo điều kiện sắp xếp
             let sortOption = {};
-            if (sortType === 'price_desc') {
-                sortOption.price = -1;
-            } else if (sortType === 'price_asc') {
-                sortOption.price = 1;
-            } else if (sortType === 'top_buy') {
-                sortOption.countBuy = -1;
-            } else if (sortType === 'sale') {
-                filter.discount = { $gt: 0 }; // Chỉ lấy sản phẩm đang giảm giá
-            }
+            if (sortType === 'price_desc') sortOption.price = -1;
+            else if (sortType === 'price_asc') sortOption.price = 1;
+            else if (sortType === 'top_buy') sortOption.countBuy = -1;
 
-            // Lấy danh sách sản phẩm theo bộ lọc và sắp xếp
-            const products = await modelProducts
-                .find(filter)
-                .sort(sortOption)
-                .populate('category', 'nameCategory')
-                .limit(limit)
-                .skip(skip);
+            // Lấy danh sách sản phẩm + tổng số sản phẩm
+            const [products, total] = await Promise.all([
+                modelProducts
+                    .find(filter)
+                    .sort(sortOption)
+                    .populate('category', 'nameCategory')
+                    .limit(limit)
+                    .skip(skip)
+                    .lean(), // Tăng hiệu suất bằng cách trả về object thuần
 
-            /// get feedback
-            const valueRating = await modelFeedback.aggregate([
-                {
-                    $group: { _id: '$productId', avgRating: { $avg: '$rating' } },
-                },
+                modelProducts.countDocuments(filter),
             ]);
 
-            // Tính toán giá sau khi giảm giá
+            // Lấy rating từ modelFeedback và join vào sản phẩm
+            const ratings = await modelFeedback.aggregate([
+                { $match: { productId: { $in: products.map((p) => p._id) } } },
+                { $group: { _id: '$productId', avgRating: { $avg: '$rating' } } },
+            ]);
+
+            // Gán rating và tính giá giảm
             const data = products.map((item) => ({
-                ...item._doc,
+                ...item,
                 nameCategory: item.category?.nameCategory,
                 price: item.price - (item.price * item.discount) / 100,
-                rating: valueRating.find((value) => value._id.toString() === item._id.toString())?.avgRating || 0,
+                rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 5,
             }));
 
-            return res.status(200).json(data);
+            return res.status(200).json({
+                data,
+                currentPage: page,
+                totalPages: Math.ceil(total / limit),
+                totalItems: total,
+            });
         } catch (error) {
-            console.log(error);
+            console.error(error);
             return res.status(500).json({ message: 'Server error !!!' });
         }
     }
@@ -186,47 +193,53 @@ class controllerProducts {
 
     async editProduct(req, res, next) {
         try {
-            // const { id } = req.body;
-            // const { name, price, description, quantity, company, publicationDate, type, size, page, publishingHouse } =
-            //     req.body;
-            // const file = req.files;
-            // if (
-            //     !name ||
-            //     !price ||
-            //     !description ||
-            //     !quantity ||
-            //     !company ||
-            //     !publicationDate ||
-            //     !type ||
-            //     !size ||
-            //     !page ||
-            //     !publishingHouse
-            // ) {
-            //     return res.status(400).json({ message: 'Vui lý nhập dữ liệu' });
-            // }
-            // const product = await modelProducts.findById(id);
-            // if (!product) {
-            //     return res.status(404).json({ message: 'Sản phẩm không tìm thấy' });
-            // }
-            // product.name = name;
-            // product.price = price;
-            // product.description = description;
-            // product.quantity = quantity;
-            // product.options.company = company;
-            // product.options.publicationDate = publicationDate;
-            // product.options.type = type;
-            // product.options.size = size;
-            // product.options.page = page;
-            // product.options.publishingHouse = publishingHouse;
-            // if (file) {
-            //     product.images = file;
-            // }
-            // await product.save();
-            // return res.status(200).json({ message: 'Chiềnh sách sản phẩm thành cong' });
-            console.log(req.body);
+            const {
+                id,
+                name,
+                price,
+                description,
+                quantity,
+                company,
+                publicationDate,
+                type,
+                size,
+                page,
+                publishingHouse,
+            } = req.body;
+            const file = req.files;
+
+            if (!id) {
+                return res.status(400).json({ message: 'Thiếu ID sản phẩm' });
+            }
+
+            const product = await modelProducts.findById(id);
+            if (!product) {
+                return res.status(404).json({ message: 'Sản phẩm không tìm thấy' });
+            }
+
+            // Cập nhật chỉ những trường có giá trị mới
+            if (name) product.name = name;
+            if (price) product.price = price;
+            if (description) product.description = description;
+            if (quantity) product.quantity = quantity;
+            if (company) product.options.company = company;
+            if (publicationDate) product.options.publicationDate = publicationDate;
+            if (type) product.options.type = type;
+            if (size) product.options.size = size;
+            if (page) product.options.page = page;
+            if (publishingHouse) product.options.publishingHouse = publishingHouse;
+            if (file.length > 0) {
+                product.images.forEach((item) => {
+                    fs.unlink(`src/uploads/products/${item}`).catch((err) => console.log(err));
+                });
+                product.images = file.map((item) => item.filename);
+            }
+
+            await product.save();
+            return res.status(200).json({ message: 'Cập nhật sản phẩm thành công' });
         } catch (error) {
             console.log(error);
-            return res.status(500).json({ message: 'Server error !!!' });
+            return res.status(500).json({ message: 'Lỗi server !!!' });
         }
     }
 
@@ -234,6 +247,32 @@ class controllerProducts {
         try {
             const products = await modelProducts.find().sort({ countBuy: -1 }).limit(5);
             return res.status(200).json(products);
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json({ message: 'Server error !!!' });
+        }
+    }
+
+    async getProductFlashSale(req, res, next) {
+        try {
+            const products = await modelProducts.find({ discount: { $gt: 0 } });
+
+            const ratings = await modelFeedback.aggregate([
+                { $match: { productId: { $in: products.map((p) => p._id) } } },
+                { $group: { _id: '$productId', avgRating: { $avg: '$rating' } } },
+            ]);
+
+            const data = await Promise.all(
+                products.map(async (item) => {
+                    const findProduct = await modelProducts.findById(item._id);
+                    return {
+                        ...findProduct._doc,
+                        price: findProduct.price - (findProduct.price * findProduct.discount) / 100,
+                        rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 5,
+                    };
+                }),
+            );
+            return res.status(200).json(data);
         } catch (error) {
             console.log(error);
             return res.status(500).json({ message: 'Server error !!!' });

@@ -55,7 +55,7 @@ class controllerCart {
             const cart = await modelCart.findOne({ userId: id });
 
             if (!cart) {
-                return res.status(404).json({ message: 'Giỏ hàng không tồn tại' });
+                return res.status(200).json({ data: [], total: 0 });
             }
 
             const idProducts = cart.products.map((item) => item.productId);
@@ -73,7 +73,7 @@ class controllerCart {
                 return {
                     images: item.images,
                     name: item.name,
-                    price: item.price,
+                    price: item.price - (item.price * item.discount) / 100,
                     quantityUserBuy: findProduct.quantity,
                     id: item._id,
                 };
@@ -102,14 +102,20 @@ class controllerCart {
         const { id } = req.decodedToken;
         const { idProduct } = req.query;
 
-        const cart = await modelCart.findOne({ userId: id });
-        const index = cart.products.findIndex((item) => item.productId === idProduct);
-        if (index !== -1) {
-            cart.products.splice(index, 1);
-            await cart.save();
-            return res.status(200).json({ message: 'Xóa sản phẩm trong giỏ hàng thành công' });
+        console.log(id);
+
+        try {
+            const cart = await modelCart.findOne({ userId: id });
+            const index = cart.products.findIndex((item) => item.productId === idProduct);
+            if (index !== -1) {
+                cart.products.splice(index, 1);
+                await cart.save();
+                return res.status(200).json({ message: 'Xóa sản phẩm trong giỏ hàng thành công' });
+            }
+            return res.status(400).json({ message: 'Sản phẩm trong giỏ hàng thất bại' });
+        } catch (error) {
+            console.log(error);
         }
-        return res.status(400).json({ message: 'Sản phẩm trong giỏ hàng thất bại' });
     }
 
     async deleteCart(req, res) {

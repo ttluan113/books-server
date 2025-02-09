@@ -25,8 +25,9 @@ function routes(app) {
     app.get('/api/get-products', productsRoutes);
     app.get('/api/get-product', productsRoutes);
     app.delete('/api/delete-product', productsRoutes);
-    app.post('/api/edit-product', productsRoutes);
+    app.put('/api/edit-product', productsRoutes);
     app.get('/api/product-top-buy', productsRoutes);
+    app.get('/api/product-flash-sale', productsRoutes);
 
     ///// category
     app.post('/api/add-category', categoryRoutes);
@@ -37,7 +38,7 @@ function routes(app) {
     /// carts
     app.post('/api/add-cart', cartRoutes);
     app.get('/api/cart', cartRoutes);
-    app.delete('/api/delete-product', cartRoutes);
+    app.delete('/api/delete-product-cart', cartRoutes);
     app.delete('/api/delete-cart', cartRoutes);
 
     /// discount

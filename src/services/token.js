@@ -43,13 +43,11 @@ const verifyToken = async (token, userId) => {
     const findApiKey = await modelApiKey.findOne({ userId });
     try {
         if (!findApiKey?.publicKey) {
-            throw new Error('Public key not found for user');
+            return res.status(403).json({ message: 'Unauthorized' });
         }
 
         return jwt.verify(token, findApiKey.publicKey, { algorithms: ['RS256'] });
-    } catch (error) {
-        console.log(error);
-    }
+    } catch (error) {}
 };
 
 module.exports = { createToken, createRefreshToken, verifyToken, createApiKey };
