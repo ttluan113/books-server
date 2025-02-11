@@ -1,11 +1,12 @@
 const modelFeedback = require('./feedback.model');
-const modelUser = require('../users/users.model');
+
+const { UnauthorizedError } = require('../core/error.response');
 
 class controllerFeedback {
     async createFeedback(req, res) {
         const { id } = req.decodedToken;
         if (!id) {
-            return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+            throw new UnauthorizedError('Unauthorized');
         }
 
         const { content, productId, rating } = req.body;

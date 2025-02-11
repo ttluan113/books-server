@@ -1,6 +1,8 @@
 const modelMessage = require('./message.model');
 const modelUser = require('../users/users.model');
 
+const { UnauthorizedError } = require('../core/error.response');
+
 class controllerMessage {
     async createMessage(req, res) {
         const { id } = req.decodedToken;
@@ -30,6 +32,7 @@ class controllerMessage {
                 receiverId: findAdmin._id,
                 content: valueMessage,
             });
+
             _userSockets.forEach((userSocket) => {
                 if (!receiverId || userSocket.user === findAdmin._id) {
                     userSocket.emit('newMessage', newMessage);
@@ -84,11 +87,34 @@ class controllerMessage {
     async getMessage(req, res) {
         try {
             const { id } = req.decodedToken;
+
             if (!id) {
-                return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+                throw new UnauthorizedError('Unauthorized');
             }
 
             const { receiverId } = req.query;
+
+            if (!receiverId) {
+                const findAdmin = await modelUser.findOne({ isAdmin: true });
+                const messages = await modelMessage.find({
+                    $or: [
+                        { senderId: id, receiverId: findAdmin._id },
+                        { senderId: findAdmin._id, receiverId: id },
+                    ],
+                });
+
+                const data = await Promise.all(
+                    messages.map(async (message) => {
+                        const user = await modelUser.findOne({ _id: message.senderId });
+                        return {
+                            ...message._doc, // Truy xuất dữ liệu gốc trong Document Mongoose
+                            fullName: user?.fullName,
+                            avatar: user?.avatar || null,
+                        };
+                    }),
+                );
+                return res.status(200).json(data);
+            }
 
             const messages = await modelMessage.find({
                 $or: [

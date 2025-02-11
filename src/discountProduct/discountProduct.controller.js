@@ -29,7 +29,20 @@ class controllerDiscountProduct {
         try {
             const products = await modelProducts.find({ discount: { $ne: null }, dateEnd: { $gte: new Date() } });
 
-            return res.status(200).json(products);
+            return res.status(201).json(products);
+        } catch (error) {
+            return res.status(500).json({ message: error.message });
+        }
+    }
+
+    async deleteDiscountProduct(req, res) {
+        try {
+            const { id } = req.query;
+            if (!id) {
+                return res.status(400).json({ message: 'Bạn đang thiếu thông tin !!!' });
+            }
+            await modelProducts.updateOne({ _id: id }, { discount: null, dateEnd: null });
+            return res.status(200).json({ message: 'Xóa khuyến mại thành công' });
         } catch (error) {
             return res.status(500).json({ message: error.message });
         }

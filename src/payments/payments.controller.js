@@ -3,6 +3,8 @@ const modelPayments = require('./payments.model');
 const modelProducts = require('../products/products.model');
 const modelUser = require('../users/users.model');
 
+const { UnauthorizedError } = require('../core/error.response');
+
 const axios = require('axios');
 const crypto = require('crypto');
 const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require('vnpay');
@@ -15,7 +17,7 @@ class controllerPayments {
             return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thống tin' });
         }
         if (!id) {
-            return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+            throw new UnauthorizedError('Unauthorized');
         }
 
         const findCart = await modelCart.findOne({ userId: id });
@@ -187,66 +189,51 @@ class controllerPayments {
     async historyOrder(req, res) {
         const { id } = req.decodedToken; // Lấy userId từ token
         const { params } = req.query;
-        const findUser = await modelUser.findOne({ _id: id });
-
-        if (!findUser) return res.status(400).json({ message: 'Người dùng không tồn tại' });
 
         try {
-            if (findUser.isAdmin === false) {
-                // Tìm lịch sử đơn hàng của user
-                const historyOrder = await modelPayments.find({ userId: id, statusOrder: params });
+            const findUser = await modelUser.findById(id);
+            if (!findUser) return res.status(400).json({ message: 'Người dùng không tồn tại' });
 
-                // Tìm thông tin sản phẩm chi tiết
-                const data = await Promise.all(
-                    historyOrder.map(async (order) => {
-                        const detailedProducts = await Promise.all(
-                            order.products.map(async (product) => {
-                                const findProduct = await modelProducts.findById(product.productId);
-                                return {
-                                    ...findProduct.toObject(), // Chuyển document MongoDB thành object
-                                    quantityUserBuy: product.quantity,
-                                };
-                            }),
-                        );
-                        return {
-                            ...order.toObject(),
-                            images: detailedProducts[0].images,
-                            name: detailedProducts[0].name,
-                            total: detailedProducts[0].price * detailedProducts[0].quantityUserBuy,
-                            quantity: detailedProducts[0].quantityUserBuy,
-                        };
-                    }),
-                );
+            const filter = findUser.isAdmin ? { statusOrder: params } : { userId: id, statusOrder: params };
+            const historyOrders = await modelPayments.find(filter);
 
-                // Trả về kết quả
-                return res.status(200).json(data);
-            }
-            if (findUser.isAdmin === true) {
-                const historyOrder = await modelPayments.find({ statusOrder: params });
-                const data = await Promise.all(
-                    historyOrder.map(async (order) => {
-                        const detailedProducts = await Promise.all(
-                            order.products.map(async (product) => {
-                                const findProduct = await modelProducts.findById(product.productId);
+            const data = await Promise.all(
+                historyOrders.map(async (order) => {
+                    const detailedProducts = await Promise.all(
+                        order.products.map(async (product) => {
+                            const findProduct = await modelProducts.findById(product.productId);
 
-                                return {
-                                    ...findProduct.toObject(), // Chuyển document MongoDB thành object
-                                    quantityUserBuy: product.quantity,
-                                };
-                            }),
-                        );
-                        return {
-                            ...order.toObject(),
-                            images: detailedProducts[0].images,
-                            name: detailedProducts[0].name,
-                            total: detailedProducts[0].price * detailedProducts[0].quantityUserBuy,
-                            quantity: detailedProducts[0].quantityUserBuy,
-                        };
-                    }),
-                );
+                            if (!findProduct) {
+                                console.warn(`Không tìm thấy sản phẩm với ID: ${product.productId}`);
+                                return null; // Tránh lỗi khi truy cập _doc
+                            }
 
-                return res.status(200).json(data);
-            }
+                            return {
+                                ...findProduct._doc,
+                                quantityUserBuy: product.quantity,
+                            };
+                        }),
+                    );
+
+                    // Lọc bỏ các sản phẩm null (nếu có)
+                    const validProducts = detailedProducts.filter((p) => p !== null);
+                    if (validProducts.length === 0) {
+                        console.warn(`Đơn hàng ${order._id} không có sản phẩm hợp lệ.`);
+                        return null;
+                    }
+
+                    return {
+                        ...order._doc,
+                        images: validProducts[0].images,
+                        name: validProducts[0].name,
+                        total: validProducts[0].price * validProducts[0].quantityUserBuy,
+                        quantity: validProducts[0].quantityUserBuy,
+                    };
+                }),
+            );
+
+            // Lọc bỏ đơn hàng null
+            return res.status(200).json(data.filter((order) => order !== null));
         } catch (error) {
             console.error(error);
             return res.status(500).json({ message: 'Internal Server Error' });

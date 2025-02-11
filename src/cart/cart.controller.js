@@ -1,12 +1,15 @@
 const modelCart = require('./cart.model');
 const modelProducts = require('../products/products.model');
 const modelDiscount = require('../discount/discount.model');
+
+const { UnauthorizedError } = require('../core/error.response');
+
 class controllerCart {
     async addCart(req, res) {
         try {
             const { id } = req.decodedToken;
             if (!id) {
-                return res.status(403).json({ message: 'Vui lòng đăng nhập ' });
+                throw new UnauthorizedError('Unauthorized');
             }
             const { productId, quantity } = req.body;
 

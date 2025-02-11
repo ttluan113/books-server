@@ -267,8 +267,9 @@ class controllerProducts {
                     const findProduct = await modelProducts.findById(item._id);
                     return {
                         ...findProduct._doc,
-                        price: findProduct.price - (findProduct.price * findProduct.discount) / 100,
+                        priceNew: findProduct.price - (findProduct.price * findProduct.discount) / 100,
                         rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 5,
+                        price: findProduct.price,
                     };
                 }),
             );

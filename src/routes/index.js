@@ -19,6 +19,12 @@ function routes(app) {
     app.get('/api/search-address', usersRoutes);
     app.post('/api/edit-user', usersRoutes);
     app.get('/api/refresh-token', usersRoutes);
+    app.get('/api/get-all-user', usersRoutes);
+    app.post('/api/create-address', usersRoutes);
+    app.delete('/api/delete-address', usersRoutes);
+    app.post('/api/heart-product', usersRoutes);
+    app.get('/api/get-heart-product', usersRoutes);
+    app.get('/api/get-heart-product-user', usersRoutes);
 
     // products
     app.post('/api/add-product', productsRoutes);
@@ -77,6 +83,7 @@ function routes(app) {
     //// discount product
     app.post('/api/create-discount-product', discountProductRoutes);
     app.get('/api/get-discount-product', discountProductRoutes);
+    app.delete('/api/delete-discount-product', discountProductRoutes);
 }
 
 module.exports = routes;

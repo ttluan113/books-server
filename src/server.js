@@ -10,6 +10,7 @@ const bodyParser = require('body-parser');
 const { jwtDecode } = require('jwt-decode');
 const { verifyToken } = require('./services/token');
 
+const { UnauthorizedError } = require('./core/error.response');
 const http = require('http');
 const server = http.createServer(app);
 const { Server } = require('socket.io');
@@ -31,21 +32,26 @@ app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(express.static(path.join(__dirname, '../src')));
 
 app.use(async (req, res, next) => {
-    const token = req.cookies.token;
+    const token = req.cookies?.token;
+
+    if (!token) {
+        return next(); // Không có token thì tiếp tục request
+    }
 
     try {
-        if (token) {
-            const decodedToken = await jwtDecode(token);
-            const validToken = await verifyToken(token, decodedToken.id);
-            if (!validToken) {
-                res.clearCookie('token');
-                return res.status(401).json({ message: 'Unauthorized' });
-            }
-            req.decodedToken = validToken;
+        const decodedToken = jwtDecode(token); // Không cần await
+        const validToken = await verifyToken(token, decodedToken.id);
+
+        if (!validToken) {
+            res.clearCookie('token');
+            return next(new UnauthorizedError('Unauthorized'));
         }
-        return next();
+
+        req.decodedToken = validToken;
+        next();
     } catch (error) {
         console.error('Token verification error:', error);
+        next(error); // Đảm bảo request không bị treo
     }
 });
 

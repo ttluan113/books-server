@@ -1,5 +1,8 @@
 const modelUser = require('../users/users.model');
 const modelNotify = require('./notify.model');
+
+const { UnauthorizedError } = require('../core/error.response');
+
 class controllerNotify {
     async postNotify(req, res) {
         const { id } = req.decodedToken;
@@ -45,7 +48,7 @@ class controllerNotify {
             const findAdmin = await modelUser.findOne({ isAdmin: true });
 
             if (!id) {
-                return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+                throw new UnauthorizedError('Unauthorized');
             }
 
             if (findAdmin.isAdmin === true) {
@@ -90,7 +93,7 @@ class controllerNotify {
             const { type, idNotify } = req.body;
             if (type === 'all') {
                 if (!id) {
-                    return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+                    throw new UnauthorizedError('Unauthorized');
                 }
                 const findUser = await modelUser.findOne({ _id: id });
                 if (findUser.isAdmin === true) {

@@ -25,4 +25,13 @@ router.get('/api/search-address', controllerUser.searchAddress);
 router.post('/api/edit-user', authUser, upload.single('avatar'), controllerUser.editUser);
 router.get('/api/refresh-token', controllerUser.refreshToken);
 
+router.get('/api/get-all-user', controllerUser.getAllUser);
+router.post('/api/create-address', controllerUser.createAddress);
+router.delete('/api/delete-address', controllerUser.deleteAddress);
+
+router.post('/api/heart-product', controllerUser.heartProduct);
+router.get('/api/get-heart-product', controllerUser.getHeartProduct);
+
+router.get('/api/get-heart-product-user', controllerUser.getHeartProductUser);
+
 module.exports = router;

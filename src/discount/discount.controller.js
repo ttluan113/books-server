@@ -3,6 +3,8 @@ const modelCart = require('../cart/cart.model');
 const modelProducts = require('../products/products.model');
 const moment = require('moment');
 
+const { UnauthorizedError } = require('../core/error.response');
+
 class controllerDiscount {
     async addDiscount(req, res) {
         const { name, dateStart, dateEnd, discount_min_value_order, discount_percent } = req.body;
@@ -46,7 +48,7 @@ class controllerDiscount {
         const { idDiscount } = req.body;
 
         if (!id) {
-            return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+            throw new UnauthorizedError('Unauthorized');
         }
 
         const findDiscount = await modelDiscount.findById(idDiscount);

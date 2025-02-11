@@ -1,5 +1,9 @@
 const modelUser = require('./users.model');
 const modelApiKey = require('../apikey/apikey.model');
+const modelProduct = require('../products/products.model');
+const modelCategory = require('../category/category.model');
+
+const { UnauthorizedError } = require('../core/error.response');
 
 const bcrypt = require('bcrypt');
 const sendMailVerifyAccount = require('../services/sendMailVerifyAccount');
@@ -127,7 +131,7 @@ class controllerUser {
 
             // Kiểm tra ID có tồn tại
             if (!id) {
-                return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+                throw new UnauthorizedError('Unauthorized');
             }
 
             // Tìm người dùng hiện tại
@@ -202,6 +206,147 @@ class controllerUser {
                 .json({ message: 'Refresh token thành công !!!' });
         } catch (error) {
             return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async getAllUser(req, res) {
+        try {
+            const users = await modelUser.find();
+            return res.status(200).json(users);
+        } catch (error) {
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async lockUser(req, res) {
+        try {
+            const { id } = req.query;
+            await modelUser.updateOne({ _id: id }, { isActive: true });
+            return res.status(200).json({ message: 'Khoá tài khoản thành công' });
+        } catch (error) {
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async createAddress(req, res) {
+        const { id } = req.decodedToken;
+        const address = req.body.data;
+
+        if (!address) {
+            return res.status(400).json({ message: 'Vui lòng nhập điểm giao hàng' });
+        }
+
+        try {
+            const findUser = await modelUser.findOne({ _id: id });
+            if (!findUser) {
+                return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+            }
+            findUser.addressDefault.push(address);
+            await findUser.save();
+            return res.status(201).json({ message: 'Thêm điểm giao hàng thành công' });
+        } catch (error) {
+            console.error('Error creating address:', error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async deleteAddress(req, res) {
+        const { id } = req.decodedToken;
+        const { idAddress } = req.query;
+
+        try {
+            const findUser = await modelUser.findOne({ _id: id });
+            if (!findUser) {
+                return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+            }
+            findUser.addressDefault = findUser.addressDefault.filter((address) => address.id !== idAddress);
+            await findUser.save();
+            return res.status(200).json({ message: 'Xóa điểm giao hàng thành công' });
+        } catch (error) {
+            console.error('Error deleting address:', error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async heartProduct(req, res) {
+        const { id } = req.decodedToken;
+        const { productId } = req.body;
+        if (!id) {
+            throw new UnauthorizedError('Unauthorized');
+        }
+        if (!productId) {
+            return res.status(400).json({ message: 'Vui lòng nhà phân phòng' });
+        }
+        try {
+            const findUser = await modelUser.findOne({ _id: id });
+            if (!findUser) {
+                return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+            }
+            const findProduct = await modelProduct.findOne({ _id: productId });
+            if (!findProduct) {
+                return res.status(404).json({ message: 'Không tìm thấy sản phẩm' });
+            }
+            if (findUser.heartProduct.includes(productId)) {
+                findUser.heartProduct = findUser.heartProduct.filter((item) => item !== productId);
+                await findUser.save();
+                return res.status(200).json({ message: 'Bỏ yêu thích thành công', success: false });
+            } else {
+                findUser.heartProduct.push(productId);
+                await findUser.save();
+                return res.status(200).json({ message: 'Thêm yêu thích thành công', success: true });
+            }
+        } catch (error) {
+            console.error('Error heart product:', error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async getHeartProduct(req, res) {
+        const { id } = req.decodedToken;
+        if (!id) {
+            throw new UnauthorizedError('Unauthorized');
+        }
+        try {
+            const findUser = await modelUser.findOne({ _id: id });
+            if (!findUser) {
+                return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+            }
+            const { heartProduct } = findUser;
+            return res.status(200).json(heartProduct);
+        } catch (error) {
+            console.error('Error heart product:', error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async getHeartProductUser(req, res) {
+        const { id } = req.decodedToken;
+        if (!id) {
+            throw new UnauthorizedError('Unauthorized');
+        }
+        try {
+            const findUser = await modelUser.findOne({ _id: id });
+            if (!findUser) {
+                return res.status(404).json({ message: 'Không tìm thấy người dùng' });
+            }
+            const { heartProduct } = findUser;
+            const products = await modelProduct.find({ _id: { $in: heartProduct } });
+            const data = await Promise.all(
+                products.map(async (product) => {
+                    const category = await modelCategory.findOne({ _id: product.category });
+                    return {
+                        _id: product._id,
+                        name: product.name,
+                        price: product.price,
+                        images: product.images[0],
+                        category: category.nameCategory,
+                    };
+                }),
+            );
+            return res.status(200).json(data);
+        } catch (error) {
+            console.error('Error heart product:', error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
         }
     }
 }

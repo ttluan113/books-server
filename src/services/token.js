@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 const modelApiKey = require('../apikey/apikey.model');
 const crypto = require('crypto');
+
+const { UnauthorizedError } = require('../core/error.response');
+
 require('dotenv').config();
 
 const createApiKey = async (userId) => {
@@ -43,7 +46,7 @@ const verifyToken = async (token, userId) => {
     const findApiKey = await modelApiKey.findOne({ userId });
     try {
         if (!findApiKey?.publicKey) {
-            return res.status(403).json({ message: 'Unauthorized' });
+            throw new UnauthorizedError('Unauthorized');
         }
 
         return jwt.verify(token, findApiKey.publicKey, { algorithms: ['RS256'] });

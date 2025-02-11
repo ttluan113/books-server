@@ -1,13 +1,15 @@
 const modelComments = require('./comments.model');
 const modelUsers = require('../users/users.model');
 
+const { UnauthorizedError } = require('../core/error.response');
+
 class controllerComments {
     async addComment(req, res) {
         const { id } = req.decodedToken;
         const { productId, content, parentId } = req.body;
 
         if (!id) {
-            return res.status(403).json({ message: 'Vui lòng đăng nhập' });
+            throw new UnauthorizedError('Unauthorized');
         }
         if (parentId) {
             await modelComments.create({ userId: id, productId, content, parentId });
