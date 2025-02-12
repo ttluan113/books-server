@@ -12,7 +12,7 @@ const { VNPay, ignoreLogger, ProductCode, VnpLocale, dateFormat } = require('vnp
 class controllerPayments {
     async paymentCod(req, res) {
         const { id } = req.decodedToken;
-        const { address, phone, typePayments, fullName } = req.body;
+        const { address, phone, typePayments } = req.body;
         if (!address || !phone || !typePayments) {
             return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thống tin' });
         }
@@ -31,6 +31,7 @@ class controllerPayments {
                 address: req.body.address,
                 phone: req.body.phone,
                 typePayments: req.body.typePayments,
+                totalPrice: findCart.total,
             });
             await newPayment.save();
             await findCart.deleteOne();

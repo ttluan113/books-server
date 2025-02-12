@@ -170,8 +170,7 @@ class controllerProducts {
             // Trả về kết quả
             return res.status(200).json({ product, brandProducts, feedbackUser });
         } catch (error) {
-            console.error('Lỗi khi lấy dữ liệu sản phẩm:', error);
-            return res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau' });
+            return res.status(500).json({ message: 'Lỗi server, vui lòng thử lại sau', success: false });
         }
     }
 

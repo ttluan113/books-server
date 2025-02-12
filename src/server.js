@@ -50,7 +50,6 @@ app.use(async (req, res, next) => {
         req.decodedToken = validToken;
         next();
     } catch (error) {
-        console.error('Token verification error:', error);
         next(error); // Đảm bảo request không bị treo
     }
 });

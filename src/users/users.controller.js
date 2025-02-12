@@ -2,20 +2,23 @@ const modelUser = require('./users.model');
 const modelApiKey = require('../apikey/apikey.model');
 const modelProduct = require('../products/products.model');
 const modelCategory = require('../category/category.model');
+const modelOtp = require('../otp/otp.model');
 
 const { UnauthorizedError } = require('../core/error.response');
-
-const bcrypt = require('bcrypt');
-const sendMailVerifyAccount = require('../services/sendMailVerifyAccount');
 const { createToken, createRefreshToken, createApiKey } = require('../services/token');
-const joi = require('joi');
-const CryptoJS = require('crypto-js');
-const searchAddress = require('../utils/searchAddress');
-const fs = require('fs/promises');
+const sendMailVerifyAccount = require('../services/sendMailVerifyAccount');
+const sendMailForgotPassword = require('../services/sendMailForgotPassword');
 
-const { jwtDecode } = require('jwt-decode');
+const searchAddress = require('../utils/searchAddress');
 const { verifyToken } = require('../services/token');
 
+const bcrypt = require('bcrypt');
+const otpGenerator = require('otp-generator');
+const jwt = require('jsonwebtoken');
+const { jwtDecode } = require('jwt-decode');
+const CryptoJS = require('crypto-js');
+const joi = require('joi');
+const fs = require('fs/promises');
 require('dotenv').config();
 
 const schemaRegister = joi.object({
@@ -73,9 +76,11 @@ class controllerUser {
 
     async logOut(req, res) {
         const { id } = req.decodedToken;
+
         if (!id) {
             return res.status(401).json({ message: 'Unauthorized' });
         }
+
         try {
             await modelApiKey.deleteOne({ userId: id });
 
@@ -347,6 +352,101 @@ class controllerUser {
         } catch (error) {
             console.error('Error heart product:', error);
             return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async forgotPassword(req, res) {
+        try {
+            const { email } = req.body;
+            if (!email) {
+                return res.status(400).json({ message: 'Vui lòng nhập email' });
+            }
+
+            const user = await modelUser.findOne({ email });
+            if (!user) {
+                return res.status(400).json({ message: 'Email không tồn tại' });
+            }
+
+            const token = jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+            const otp = await otpGenerator.generate(6, {
+                digits: true,
+                lowerCaseAlphabets: false,
+                upperCaseAlphabets: false,
+                specialChars: false,
+            });
+
+            const saltRounds = 10;
+
+            bcrypt.hash(otp, saltRounds, async function (err, hash) {
+                if (err) {
+                    console.error('Error hashing OTP:', err);
+                } else {
+                    await modelOtp.create({
+                        email: user.email,
+                        otp: hash,
+                    });
+                    await sendMailForgotPassword(email, otp);
+
+                    return res
+                        .setHeader('Set-Cookie', [
+                            `tokenResetPassword=${token};  Secure; Max-Age=300; Path=/; SameSite=Strict`,
+                        ])
+                        .status(200)
+                        .json({ message: 'Gửi thành công !!!' });
+                }
+            });
+        } catch (error) {
+            console.error('Error forgot password:', error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra' });
+        }
+    }
+
+    async resetPassword(req, res) {
+        try {
+            const token = req.cookies.tokenResetPassword;
+            const { otp, password } = req.body;
+
+            if (!token) {
+                return res.status(400).json({ message: 'Vui lòng gửi yêu cầu quên mật khẩu' });
+            }
+
+            const decode = jwt.verify(token, process.env.JWT_SECRET);
+            if (!decode) {
+                return res.status(400).json({ message: 'Sai mã OTP hoặc đã hết hạn, vui lòng lấy OTP mới' });
+            }
+
+            const findOTP = await modelOtp.findOne({ email: decode.email });
+            if (!findOTP) {
+                return res.status(400).json({ message: 'Sai mã OTP hoặc đã hết hạn, vui lòng lấy OTP mới' });
+            }
+
+            // So sánh OTP
+            const isMatch = await bcrypt.compare(otp, findOTP.otp);
+            if (!isMatch) {
+                return res.status(400).json({ message: 'Sai mã OTP hoặc đã hết hạn, vui lòng lấy OTP mới' });
+            }
+
+            // Hash mật khẩu mới
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+            // Tìm người dùng
+            const findUser = await modelUser.findOne({ email: decode.email });
+            if (!findUser) {
+                return res.status(400).json({ message: 'Người dùng không tồn tại' });
+            }
+
+            // Cập nhật mật khẩu mới
+            findUser.password = hashedPassword;
+            await findUser.save();
+
+            // Xóa OTP sau khi đặt lại mật khẩu thành công
+            await modelOtp.deleteOne({ email: decode.email });
+            res.clearCookie('tokenResetPassword');
+            return res.status(200).json({ message: 'Đặt lại mật khẩu thành công' });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({ message: 'Có lỗi xảy ra, vui lòng liên hệ ADMIN !!' });
         }
     }
 }

@@ -15,6 +15,7 @@ const modelPayments = new Schema(
             enum: ['pending', 'completed', 'shipping', 'delivered', 'cancelled'],
             default: 'pending',
         },
+        totalPrice: { type: Number, require: true },
     },
     {
         timestamps: true,

@@ -9,6 +9,8 @@ const messageRoutes = require('../messages/message.routes');
 const feedbackRoutes = require('../feedback/feedback.routes');
 const categoryRoutes = require('../category/category.routes');
 const discountProductRoutes = require('../discountProduct/discountProduct.routes');
+const statisticalRoutes = require('../statistical/statistical.routes');
+const blogsRoutes = require('../blogs/blogs.routes');
 
 function routes(app) {
     // users
@@ -25,6 +27,8 @@ function routes(app) {
     app.post('/api/heart-product', usersRoutes);
     app.get('/api/get-heart-product', usersRoutes);
     app.get('/api/get-heart-product-user', usersRoutes);
+    app.post('/api/forgot-password', usersRoutes);
+    app.post('/api/reset-password', usersRoutes);
 
     // products
     app.post('/api/add-product', productsRoutes);
@@ -84,6 +88,17 @@ function routes(app) {
     app.post('/api/create-discount-product', discountProductRoutes);
     app.get('/api/get-discount-product', discountProductRoutes);
     app.delete('/api/delete-discount-product', discountProductRoutes);
+
+    //// statistical
+    app.get('/api/statistical', statisticalRoutes);
+
+    // blgos
+    app.post('/api/create-blog', blogsRoutes);
+    app.get('/api/blogs', blogsRoutes);
+    app.get('/api/blog', blogsRoutes);
+    app.delete('/api/delete-blog', blogsRoutes);
+
+    app.get('/api/admin', usersRoutes);
 }
 
 module.exports = routes;
