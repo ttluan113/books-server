@@ -27,7 +27,9 @@ class controllerCart {
                 const newCart = new modelCart({
                     userId: id,
                     products: [{ productId, quantity }],
-                    total: findProduct.price * quantity,
+                    total: findProduct.discount
+                        ? findProduct.price * quantity - (findProduct.price * quantity * findProduct.discount) / 100
+                        : findProduct.price * quantity,
                 });
                 await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
 
@@ -38,11 +40,21 @@ class controllerCart {
             if (index !== -1) {
                 cart.products[index].quantity += quantity;
                 await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
-                await cart.updateOne({ total: cart.total + findProduct.price * quantity });
+                await cart.updateOne({
+                    total:
+                        cart.total + findProduct.discount
+                            ? findProduct.price * quantity - (findProduct.price * quantity * findProduct.discount) / 100
+                            : findProduct.price * quantity,
+                });
             } else {
                 cart.products.push({ productId, quantity });
                 await findProduct.updateOne({ quantity: findProduct.quantity - quantity });
-                await cart.updateOne({ total: cart.total + findProduct.price * quantity });
+                await cart.updateOne({
+                    total:
+                        cart.total + findProduct.discount
+                            ? findProduct.price * quantity - (findProduct.price * quantity * findProduct.discount) / 100
+                            : findProduct.price * quantity,
+                });
             }
             await cart.save();
             return res.status(200).json({ message: 'Thêm vào giỏ hàng thành công ' });
@@ -104,8 +116,6 @@ class controllerCart {
     async deleteProductCart(req, res) {
         const { id } = req.decodedToken;
         const { idProduct } = req.query;
-
-        console.log(id);
 
         try {
             const cart = await modelCart.findOne({ userId: id });
