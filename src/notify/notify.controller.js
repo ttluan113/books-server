@@ -27,6 +27,7 @@ class controllerNotify {
             const notifyData = {
                 ...data.toObject(),
                 fullName: findUser?.fullName || findAdmin?.fullName,
+                avatar: findUser?.avatar || findAdmin?.avatar,
             };
 
             _userSockets.forEach((userSocket) => {
@@ -108,6 +109,7 @@ class controllerNotify {
                 await modelNotify.updateOne({ _id: idNotify }, { isRead: true });
                 return res.status(200).json({ message: 'Thành công' });
             }
+            return res.status(200).json({ message: 'Thành công' });
         } catch (error) {
             console.error('Lỗi khi lấy thông báo:', error);
             return res.status(500).json({ message: 'Đã xảy ra lỗi máy chủ' });

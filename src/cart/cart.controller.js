@@ -120,11 +120,19 @@ class controllerCart {
         try {
             const cart = await modelCart.findOne({ userId: id });
             const index = cart.products.findIndex((item) => item.productId === idProduct);
+
+            const quantityUserBuy = cart.products.find(
+                (product) => product.productId.toString() === idProduct.toString(),
+            ).quantity;
+
+            await modelProducts.updateOne({ _id: idProduct }, { $inc: { quantity: quantityUserBuy } });
+
             if (index !== -1) {
                 cart.products.splice(index, 1);
                 await cart.save();
                 return res.status(200).json({ message: 'Xóa sản phẩm trong giỏ hàng thành công' });
             }
+
             return res.status(400).json({ message: 'Sản phẩm trong giỏ hàng thất bại' });
         } catch (error) {
             console.log(error);
@@ -134,6 +142,7 @@ class controllerCart {
     async deleteCart(req, res) {
         const { id } = req.decodedToken;
         const cart = await modelCart.findOneAndDelete({ userId: id });
+
         if (!cart) {
             return res.status(400).json({ message: 'Giỏ hàng thất bại' });
         }

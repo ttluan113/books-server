@@ -21,6 +21,7 @@ const modelUser = new Schema(
 
         heartProduct: [{ type: String, default: '', ref: 'products' }],
         refreshToken: { type: Array, default: [] },
+        lastOnline: { type: Date, default: Date.now() },
     },
     {
         timestamps: true,

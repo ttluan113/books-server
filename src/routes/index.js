@@ -73,7 +73,7 @@ function routes(app) {
     /// notify
     app.post('/api/add-notify', notifyRoutes);
     app.get('/api/notify', notifyRoutes);
-    app.post('/api/read-all-notify', notifyRoutes);
+    app.post('/api/read-notify', notifyRoutes);
 
     // message
     app.post('/api/create-message', messageRoutes);
