@@ -38,6 +38,7 @@ function routes(app) {
     app.put('/api/edit-product', productsRoutes);
     app.get('/api/product-top-buy', productsRoutes);
     app.get('/api/product-flash-sale', productsRoutes);
+    app.get('/api/search-product', productsRoutes);
 
     ///// category
     app.post('/api/add-category', categoryRoutes);

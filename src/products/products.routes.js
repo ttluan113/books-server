@@ -27,5 +27,6 @@ router.delete('/api/delete-product', authAdmin, controllerProducts.deleteProduct
 router.put('/api/edit-product', authAdmin, upload.array('images'), controllerProducts.editProduct);
 
 router.get('/api/product-flash-sale', controllerProducts.getProductFlashSale);
+router.get('/api/search-product', controllerProducts.searchProduct);
 
 module.exports = router;

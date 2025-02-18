@@ -268,10 +268,26 @@ class controllerProducts {
                         ...findProduct._doc,
                         priceNew: findProduct.price - (findProduct.price * findProduct.discount) / 100,
                         rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 5,
-                        price: findProduct.price,
+                        price: item.price - (item.price * item.discount) / 100,
                     };
                 }),
             );
+            return res.status(200).json(data);
+        } catch (error) {
+            console.log(error);
+            return res.status(500).json({ message: 'Server error !!!' });
+        }
+    }
+
+    async searchProduct(req, res) {
+        try {
+            const { name } = req.query;
+            const products = await modelProducts.find({
+                $or: [{ name: { $regex: name, $options: 'i' } }, { description: { $regex: name, $options: 'i' } }],
+            });
+
+            const data = products.filter((item) => item.quantity > 0);
+
             return res.status(200).json(data);
         } catch (error) {
             console.log(error);
