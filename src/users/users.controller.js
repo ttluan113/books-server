@@ -4,9 +4,11 @@ const modelProduct = require('../products/products.model');
 const modelCategory = require('../category/category.model');
 const modelOtp = require('../otp/otp.model');
 
+const { OAuth2Client } = require('google-auth-library');
+
 const { UnauthorizedError } = require('../core/error.response');
 const { createToken, createRefreshToken, createApiKey } = require('../services/token');
-const sendMailVerifyAccount = require('../services/sendMailVerifyAccount');
+const verifyAccount = require('../services/verifyAccount');
 const sendMailForgotPassword = require('../services/sendMailForgotPassword');
 
 const searchAddress = require('../utils/searchAddress');
@@ -19,6 +21,7 @@ const { jwtDecode } = require('jwt-decode');
 const CryptoJS = require('crypto-js');
 const joi = require('joi');
 const fs = require('fs/promises');
+
 require('dotenv').config();
 
 const schemaRegister = joi.object({
@@ -40,26 +43,78 @@ class controllerUser {
             return res.status(400).json({ message: 'Vui lòng xem lại thông tin' });
         }
         const user = await modelUser.findOne({ email });
+        if (user.isActive === false) {
+            const token = jwt.sign({ id: user.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+            const otp = await otpGenerator.generate(6, {
+                digits: true,
+                lowerCaseAlphabets: false,
+                upperCaseAlphabets: false,
+                specialChars: false,
+            });
+            const saltRounds = 10;
+            bcrypt.hash(otp, saltRounds, async function (err, hash) {
+                if (err) {
+                    console.error('Error hashing OTP:', err);
+                } else {
+                    await modelOtp.create({
+                        email: user.email,
+                        otp: hash,
+                        type: 'verifyAccount',
+                    });
+                    await verifyAccount(email, otp);
+
+                    return res
+                        .setHeader('Set-Cookie', [
+                            `tokenVerify=${token};  Secure; Max-Age=300; Path=/; SameSite=Strict`,
+                        ])
+                        .status(400)
+                        .json({
+                            message: 'Đăng ký thành công, vui lòng kiểm tra email để xác thực tài khoản',
+                            success: false,
+                        });
+                }
+            });
+            return;
+        }
+
         if (user) {
             return res.status(400).json({ message: 'Email đã tồn tại' });
         }
+
         const salt = await bcrypt.genSalt(10);
         const hashPassword = await bcrypt.hash(password, salt);
         const newUser = new modelUser({ fullName, email, password: hashPassword, phone });
         await newUser.save();
         await createApiKey(newUser._id);
-        // await sendMailVerifyAccount(email);
-        const accessToken = await createToken({ id: newUser._id, isAdmin: newUser.isAdmin });
-        const refreshToken = await createRefreshToken({ id: newUser._id, isAdmin: newUser.isAdmin });
+        const token = jwt.sign({ id: newUser.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
 
-        return res
-            .setHeader('Set-Cookie', [
-                `token=${accessToken}; HttpOnly; Secure; Max-Age=86400; Path=/; SameSite=Strict`,
-                `refreshToken=${refreshToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`, // 7 ngày cho refreshToken
-                `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
-            ])
-            .status(200)
-            .json({ message: 'Đăng ký thành công !!!' });
+        const otp = await otpGenerator.generate(6, {
+            digits: true,
+            lowerCaseAlphabets: false,
+            upperCaseAlphabets: false,
+            specialChars: false,
+        });
+        const saltRounds = 10;
+        bcrypt.hash(otp, saltRounds, async function (err, hash) {
+            if (err) {
+                console.error('Error hashing OTP:', err);
+            } else {
+                await modelOtp.create({
+                    email: newUser.email,
+                    otp: hash,
+                    type: 'verifyAccount',
+                });
+                await verifyAccount(email, otp);
+
+                return res
+                    .setHeader('Set-Cookie', [`tokenVerify=${token};  Secure; Max-Age=300; Path=/; SameSite=Strict`])
+                    .status(200)
+                    .json({ message: 'Đăng ký thành công, vui lòng kiểm tra email để xác thực tài khoản' });
+            }
+        });
+
+        await verifyAccount(email, otp);
     }
 
     async auth(req, res) {
@@ -103,6 +158,43 @@ class controllerUser {
         if (!user) {
             return res.status(400).json({ message: 'Email không tồn tại' });
         }
+
+        if (user && user.isActive === false) {
+            await createApiKey(user._id);
+            const token = jwt.sign({ id: user.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+
+            const otp = await otpGenerator.generate(6, {
+                digits: true,
+                lowerCaseAlphabets: false,
+                upperCaseAlphabets: false,
+                specialChars: false,
+            });
+            const saltRounds = 10;
+            bcrypt.hash(otp, saltRounds, async function (err, hash) {
+                if (err) {
+                    console.error('Error hashing OTP:', err);
+                } else {
+                    await modelOtp.create({
+                        email: user.email,
+                        otp: hash,
+                        type: 'verifyAccount',
+                    });
+                    await verifyAccount(email, otp);
+
+                    return res
+                        .setHeader('Set-Cookie', [
+                            `tokenVerify=${token};  Secure; Max-Age=300; Path=/; SameSite=Strict`,
+                        ])
+                        .status(400)
+                        .json({
+                            message: 'Đăng ký nhập thành công, vui lòng kiểm tra email để xác thực tài khoản',
+                            success: false,
+                        });
+                }
+            });
+            return;
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không đúng' });
@@ -121,6 +213,56 @@ class controllerUser {
             ])
             .status(200)
             .json({ message: 'Đăng nhập thành công !!!' });
+    }
+
+    async loginGoogle(req, res) {
+        const { tokenGoogle } = req.body;
+        const client = new OAuth2Client('557300558214-reaeakjcrt02nvfv8kbehppk0s0pd0o8.apps.googleusercontent.com');
+        try {
+            const ticket = await client.verifyIdToken({
+                idToken: tokenGoogle,
+                audience: '557300558214-reaeakjcrt02nvfv8kbehppk0s0pd0o8.apps.googleusercontent.com',
+            });
+            const payload = ticket.getPayload();
+
+            const { email, name, picture } = payload;
+
+            const user = await modelUser.findOne({ email });
+            if (!user) {
+                const newUser = new modelUser({
+                    fullName: name,
+                    email,
+                    phone: 0,
+                    avatar: picture,
+                    isActive: true,
+                });
+                await newUser.save();
+                await createApiKey(newUser._id);
+                const accessToken = await createToken({ id: newUser._id, isAdmin: newUser.isAdmin });
+                const refreshToken = await createRefreshToken({ id: newUser._id, isAdmin: newUser.isAdmin });
+                return res
+                    .setHeader('Set-Cookie', [
+                        `token=${accessToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`,
+                        `refreshToken=${refreshToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`, // 7 ngày cho refreshToken
+                        `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
+                    ])
+                    .status(200)
+                    .json({ message: 'Đăng nhập thành công !!!' });
+            }
+            await createApiKey(user._id);
+            const accessToken = await createToken({ id: user._id, isAdmin: user.isAdmin });
+            const refreshToken = await createRefreshToken({ id: user._id, isAdmin: user.isAdmin });
+            return res
+                .setHeader('Set-Cookie', [
+                    `token=${accessToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`,
+                    `refreshToken=${refreshToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`, // 7 ngày cho refreshToken
+                    `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
+                ])
+                .status(200)
+                .json({ message: 'Đăng nhập thành công !!!' });
+        } catch (error) {
+            console.log(error);
+        }
     }
 
     async searchAddress(req, res) {
@@ -384,6 +526,7 @@ class controllerUser {
                     await modelOtp.create({
                         email: user.email,
                         otp: hash,
+                        type: 'forgotPassword',
                     });
                     await sendMailForgotPassword(email, otp);
 
@@ -448,6 +591,46 @@ class controllerUser {
             console.error(error);
             return res.status(500).json({ message: 'Có lỗi xảy ra, vui lòng liên hệ ADMIN !!' });
         }
+    }
+
+    async verifyAccount(req, res) {
+        const { otp } = req.body;
+        const token = req.cookies.tokenVerify;
+        if (!token) {
+            return res
+                .status(400)
+                .json({ message: 'Vui lòng gửi yêu cầu xác thực tài khoản bằng cách đăng nhập hoặc đăng ký' });
+        }
+        const decode = jwt.verify(token, process.env.JWT_SECRET);
+
+        const findOtp = await modelOtp.findOne({ email: decode.id });
+
+        if (!findOtp) {
+            return res.status(400).json({ message: 'Thông tin không chính xác' });
+        }
+
+        const isMatch = await bcrypt.compare(otp, findOtp.otp);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'OTP sai vui lòng kiểm tra lại' });
+        }
+
+        const findUser = await modelUser.findOne({ email: decode.id });
+        if (!findUser) {
+            return res.status(400).json({ message: 'Người dùng không tồn tại' });
+        }
+        await findUser.updateOne({ isActive: true });
+        await modelOtp.deleteOne({ email: decode.email });
+        res.clearCookie('tokenVerify');
+        const accessToken = await createToken({ id: findUser._id, isAdmin: findUser.isAdmin });
+        const refreshToken = await createRefreshToken({ id: findUser._id, isAdmin: findUser.isAdmin });
+        return res
+            .setHeader('Set-Cookie', [
+                `token=${accessToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`,
+                `refreshToken=${refreshToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`, // 7 ngày cho refreshToken
+                `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
+            ])
+            .status(200)
+            .json({ message: 'Đăng nhập thành công !!!' });
     }
 }
 

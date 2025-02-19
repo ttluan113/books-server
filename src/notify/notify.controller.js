@@ -46,19 +46,16 @@ class controllerNotify {
         try {
             const { id } = req.decodedToken;
 
-            const findAdmin = await modelUser.findOne({ isAdmin: true });
+            // Tìm chính xác user hiện tại, không phải bất kỳ admin nào
+            const findAdmin = await modelUser.findOne({ _id: id, isAdmin: true });
 
-            if (!id) {
-                throw new UnauthorizedError('Unauthorized');
-            }
-
-            if (findAdmin.isAdmin === true) {
+            if (findAdmin) {
                 const notify = await modelNotify.find({ parentId: null });
                 const userNotifications = await Promise.all(
                     notify.map(async (notification) => {
                         const user = await modelUser.findOne({ _id: notification.senderId });
                         return {
-                            ...notification._doc, // Truy xuất dữ liệu gốc trong Document Mongoose
+                            ...notification._doc,
                             fullName: user?.fullName || 'Người dùng không tồn tại',
                             avatar: user?.avatar || null,
                         };
@@ -67,14 +64,14 @@ class controllerNotify {
                 return res.status(200).json(userNotifications || []);
             }
 
+            // Nếu không phải admin, chỉ lấy notify của chính họ
             const notify = await modelNotify.find({ receiverId: id });
 
-            // Sử dụng Promise.all để chờ tất cả các tác vụ bất đồng bộ trong map
             const userNotifications = await Promise.all(
                 notify.map(async (notification) => {
                     const user = await modelUser.findOne({ _id: notification.senderId });
                     return {
-                        ...notification._doc, // Truy xuất dữ liệu gốc trong Document Mongoose
+                        ...notification._doc,
                         fullName: user?.fullName || 'Người dùng không tồn tại',
                         avatar: user?.avatar || null,
                     };
@@ -84,7 +81,7 @@ class controllerNotify {
             return res.status(200).json(userNotifications || []);
         } catch (error) {
             console.error('Lỗi khi lấy thông báo:', error);
-            return res.status(200).json([]);
+            return res.status(500).json({ message: 'Lỗi máy chủ' });
         }
     }
 

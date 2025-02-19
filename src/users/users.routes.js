@@ -34,4 +34,7 @@ router.get('/api/get-heart-product-user', authUser, controllerUser.getHeartProdu
 router.post('/api/forgot-password', controllerUser.forgotPassword);
 router.post('/api/reset-password', controllerUser.resetPassword);
 
+router.post('/api/login-google', controllerUser.loginGoogle);
+router.post('/api/verify-account', controllerUser.verifyAccount);
+
 module.exports = router;

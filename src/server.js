@@ -16,6 +16,10 @@ const server = http.createServer(app);
 const { Server } = require('socket.io');
 const io = new Server(server);
 
+const cronJobsCart = require('./services/cronJobsCart');
+
+cronJobsCart();
+
 global._io = io;
 const userSockets = new Map();
 global._userSockets = userSockets;

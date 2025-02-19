@@ -29,6 +29,8 @@ function routes(app) {
     app.get('/api/get-heart-product-user', usersRoutes);
     app.post('/api/forgot-password', usersRoutes);
     app.post('/api/reset-password', usersRoutes);
+    app.post('/api/login-google', usersRoutes);
+    app.post('/api/verify-account', usersRoutes);
 
     // products
     app.post('/api/add-product', productsRoutes);

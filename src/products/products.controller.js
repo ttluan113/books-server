@@ -116,7 +116,7 @@ class controllerProducts {
                 ...item,
                 nameCategory: item.category?.nameCategory,
                 price: item.price - (item.price * item.discount) / 100,
-                rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 5,
+                rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 0,
             }));
 
             return res.status(200).json({
@@ -140,6 +140,7 @@ class controllerProducts {
             const product = {
                 ...dataProduct._doc,
                 price: dataProduct.price - (dataProduct.price * dataProduct.discount) / 100,
+                rating: dataProduct.rating || 0,
             };
             if (!product) {
                 return res.status(404).json({ message: 'Sản phẩm không tồn tại' });
@@ -267,7 +268,7 @@ class controllerProducts {
                     return {
                         ...findProduct._doc,
                         priceNew: findProduct.price - (findProduct.price * findProduct.discount) / 100,
-                        rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 5,
+                        rating: ratings.find((r) => r._id.toString() === item._id.toString())?.avgRating || 0,
                         price: item.price - (item.price * item.discount) / 100,
                     };
                 }),
