@@ -2,6 +2,7 @@ const axios = require('axios');
 require('dotenv').config();
 
 const searchAddress = async (address) => {
+    
     try {
         const response = await axios.get('https://rsapi.goong.io/Place/AutoComplete', {
             params: {

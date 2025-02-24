@@ -37,85 +37,85 @@ const schemaRegister = joi.object({
 
 class controllerUser {
     async register(req, res) {
-        const { fullName, email, password, phone } = req.body;
-        const { error } = schemaRegister.validate(req.body);
-        if (error) {
-            return res.status(400).json({ message: 'Vui lòng xem lại thông tin' });
-        }
-        const user = await modelUser.findOne({ email });
-        if (user.isActive === false) {
-            const token = jwt.sign({ id: user.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
-
-            const otp = await otpGenerator.generate(6, {
-                digits: true,
-                lowerCaseAlphabets: false,
-                upperCaseAlphabets: false,
-                specialChars: false,
-            });
-            const saltRounds = 10;
-            bcrypt.hash(otp, saltRounds, async function (err, hash) {
-                if (err) {
-                    console.error('Error hashing OTP:', err);
-                } else {
+        try {
+            const { fullName, email, password, phone } = req.body;
+            const { error } = schemaRegister.validate(req.body);
+            if (error) {
+                return res.status(400).json({ message: 'Vui lòng xem lại thông tin' });
+            }
+    
+            const user = await modelUser.findOne({ email });
+    
+            if (user) {
+                if (!user.isActive) {
+                    const token = jwt.sign({ id: user.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    
+                    const otp = otpGenerator.generate(6, {
+                        digits: true,
+                        lowerCaseAlphabets: false,
+                        upperCaseAlphabets: false,
+                        specialChars: false,
+                    });
+    
+                    const hashedOtp = await bcrypt.hash(otp, 10);
+    
                     await modelOtp.create({
                         email: user.email,
-                        otp: hash,
+                        otp: hashedOtp,
                         type: 'verifyAccount',
+                        typeLogin: 'email',
                     });
+    
                     await verifyAccount(email, otp);
-
+    
                     return res
-                        .setHeader('Set-Cookie', [
-                            `tokenVerify=${token};  Secure; Max-Age=300; Path=/; SameSite=Strict`,
-                        ])
+                        .setHeader('Set-Cookie', `tokenVerify=${token}; Secure; Max-Age=300; Path=/; SameSite=Strict`)
                         .status(400)
                         .json({
                             message: 'Đăng ký thành công, vui lòng kiểm tra email để xác thực tài khoản',
                             success: false,
                         });
                 }
-            });
-            return;
-        }
-
-        if (user) {
-            return res.status(400).json({ message: 'Email đã tồn tại' });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const hashPassword = await bcrypt.hash(password, salt);
-        const newUser = new modelUser({ fullName, email, password: hashPassword, phone });
-        await newUser.save();
-        await createApiKey(newUser._id);
-        const token = jwt.sign({ id: newUser.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
-
-        const otp = await otpGenerator.generate(6, {
-            digits: true,
-            lowerCaseAlphabets: false,
-            upperCaseAlphabets: false,
-            specialChars: false,
-        });
-        const saltRounds = 10;
-        bcrypt.hash(otp, saltRounds, async function (err, hash) {
-            if (err) {
-                console.error('Error hashing OTP:', err);
-            } else {
-                await modelOtp.create({
-                    email: newUser.email,
-                    otp: hash,
-                    type: 'verifyAccount',
-                });
-                await verifyAccount(email, otp);
-
-                return res
-                    .setHeader('Set-Cookie', [`tokenVerify=${token};  Secure; Max-Age=300; Path=/; SameSite=Strict`])
-                    .status(200)
-                    .json({ message: 'Đăng ký thành công, vui lòng kiểm tra email để xác thực tài khoản' });
+    
+                return res.status(400).json({ message: 'Email đã tồn tại' });
             }
-        });
-
-        await verifyAccount(email, otp);
+    
+            // Tạo tài khoản mới
+            const hashPassword = await bcrypt.hash(password, 10);
+            const newUser = new modelUser({ fullName, email, password: hashPassword, phone });
+            await newUser.save();
+            await createApiKey(newUser._id);
+    
+            const token = jwt.sign({ id: newUser.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    
+            const otp = otpGenerator.generate(6, {
+                digits: true,
+                lowerCaseAlphabets: false,
+                upperCaseAlphabets: false,
+                specialChars: false,
+            });
+    
+            const hashedOtp = await bcrypt.hash(otp, 10);
+    
+            await modelOtp.create({
+                email: newUser.email,
+                otp: hashedOtp,
+                type: 'verifyAccount',
+            });
+    
+            await verifyAccount(email, otp);
+    
+            return res
+                .setHeader('Set-Cookie', `tokenVerify=${token}; Secure; Max-Age=300; Path=/; SameSite=Strict`)
+                .status(200)
+                .json({ message: 'Đăng ký thành công, vui lòng kiểm tra email để xác thực tài khoản' });
+    
+        } catch (error) {
+            console.error('Lỗi trong quá trình đăng ký:', error);
+            return res.status(500).json({ message: 'Đã có lỗi xảy ra, vui lòng thử lại sau' });
+        }
     }
+    
 
     async auth(req, res) {
         try {
@@ -152,69 +152,85 @@ class controllerUser {
         }
     }
 
-    async login(req, res) {
-        const { email, password } = req.body;
-        const user = await modelUser.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ message: 'Email không tồn tại' });
-        }
-
-        if (user && user.isActive === false) {
-            await createApiKey(user._id);
-            const token = jwt.sign({ id: user.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
-
-            const otp = await otpGenerator.generate(6, {
-                digits: true,
-                lowerCaseAlphabets: false,
-                upperCaseAlphabets: false,
-                specialChars: false,
-            });
-            const saltRounds = 10;
-            bcrypt.hash(otp, saltRounds, async function (err, hash) {
-                if (err) {
-                    console.error('Error hashing OTP:', err);
-                } else {
-                    await modelOtp.create({
-                        email: user.email,
-                        otp: hash,
-                        type: 'verifyAccount',
+    async  login(req, res) {
+        try {
+            const { email, password } = req.body;
+            
+            if (!email || !password) {
+                return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu' });
+            }
+    
+            const user = await modelUser.findOne({ email });
+            if (!user) {
+                return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không đúng' });
+            }
+    
+            // Xử lý nếu tài khoản chưa kích hoạt
+            if (!user.isActive) {
+                await createApiKey(user._id);
+                const token = jwt.sign({ id: user.email }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    
+                // Tạo OTP ngẫu nhiên
+                const otp = otpGenerator.generate(6, {
+                    digits: true,
+                    lowerCaseAlphabets: false,
+                    upperCaseAlphabets: false,
+                    specialChars: false,
+                });
+    
+                // Hash OTP với bcrypt và lưu vào database
+                const saltRounds = 10;
+                const hashedOtp = await bcrypt.hash(otp, saltRounds);
+                await modelOtp.create({
+                    email: user.email,
+                    otp: hashedOtp,
+                    type: 'verifyAccount',
+                });
+    
+                // Gửi email xác thực tài khoản
+                await verifyAccount(email, otp);
+    
+                return res
+                    .setHeader('Set-Cookie', `tokenVerify=${token}; Secure; Max-Age=900; Path=/; SameSite=Strict`)
+                    .status(400)
+                    .json({
+                        message: 'Đăng ký nhập thành công, vui lòng kiểm tra email để xác thực tài khoản',
+                        success: false,
                     });
-                    await verifyAccount(email, otp);
-
-                    return res
-                        .setHeader('Set-Cookie', [
-                            `tokenVerify=${token};  Secure; Max-Age=300; Path=/; SameSite=Strict`,
-                        ])
-                        .status(400)
-                        .json({
-                            message: 'Đăng ký nhập thành công, vui lòng kiểm tra email để xác thực tài khoản',
-                            success: false,
-                        });
-                }
-            });
-            return;
+            }
+            if(user.typeLogin === 'google') {
+                return res.status(400).json({ message: 'Tài khoản đăng nhập bằng google ' });
+            }
+            // Kiểm tra mật khẩu
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không đúng' });
+            }
+    
+            // Kiểm tra API key
+            const findApiKey = await modelApiKey.findOne({ userId: user._id });
+            if (!findApiKey) {
+                await createApiKey(user._id);
+            }
+    
+            // Tạo JWT token
+            const accessToken = await createToken({ id: user._id, isAdmin: user.isAdmin });
+            const refreshToken = await createRefreshToken({ id: user._id, isAdmin: user.isAdmin });
+    
+            return res
+                .setHeader('Set-Cookie', [
+                    `token=${accessToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`,
+                    `refreshToken=${refreshToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`,
+                    `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
+                ])
+                .status(200)
+                .json({ message: 'Đăng nhập thành công !!!' });
+        } catch (error) {
+            console.error('Lỗi đăng nhập:', error);
+            return res.status(500).json({ message: 'Lỗi máy chủ, vui lòng thử lại sau' });
         }
-
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Tài khoản hoặc mật khẩu không đúng' });
-        }
-        const findApiKey = await modelApiKey.findOne({ userId: user._id });
-        if (!findApiKey) {
-            await createApiKey(user._id);
-        }
-        const accessToken = await createToken({ id: user._id, isAdmin: user.isAdmin });
-        const refreshToken = await createRefreshToken({ id: user._id, isAdmin: user.isAdmin });
-        return res
-            .setHeader('Set-Cookie', [
-                `token=${accessToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`,
-                `refreshToken=${refreshToken}; HttpOnly; Secure; Max-Age=604800; Path=/; SameSite=Strict`, // 7 ngày cho refreshToken
-                `logged=${1}; Max-Age=86400; Path=/; SameSite=Lax`,
-            ])
-            .status(200)
-            .json({ message: 'Đăng nhập thành công !!!' });
     }
-
+    
     async loginGoogle(req, res) {
         const { tokenGoogle } = req.body;
         const client = new OAuth2Client('557300558214-reaeakjcrt02nvfv8kbehppk0s0pd0o8.apps.googleusercontent.com');
@@ -235,6 +251,7 @@ class controllerUser {
                     phone: 0,
                     avatar: picture,
                     isActive: true,
+                    typeLogin : 'google'
                 });
                 await newUser.save();
                 await createApiKey(newUser._id);
@@ -267,7 +284,6 @@ class controllerUser {
 
     async searchAddress(req, res) {
         const { address } = req.query;
-
         const result = await searchAddress(address);
         return res.status(200).json(result);
     }
